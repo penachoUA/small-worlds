@@ -48,6 +48,7 @@ const CAMERA_CONFIGS = {
 
 export default class Game {
 	constructor(scene, renderer, debug = false) {
+		this.clock = new THREE.Clock();
 		this.scene = scene;
 		this.renderer = renderer;
 		this.input = new InputHandler();
@@ -68,11 +69,13 @@ export default class Game {
 	}
 
 	update() {
+		const delta = this.clock.getDelta();
 		this.planets.forEach((p) => p.move());
 
 		if (this.cameraMode === CAMERA_MODES.THIRD_PERSON || this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
-			this.player.update();
 			this.playerController.update();
+			this.player.update(delta);
+			this.player.resetState();
 		}
 
 		// Handle camera mode changes
@@ -90,7 +93,6 @@ export default class Game {
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
 		this.renderer.render(this.scene, this.cameraRig.camera);
-		console.log(this.activeCameraController.currentPitch);
 
 		// Handle debug mode toggling
 		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {

@@ -14,6 +14,12 @@ const CONFIG = {
 	DEFAULT_SPEED: 0.045
 };
 
+export const PLAYER_STATES = {
+	IDLE: 'idle',
+	WALKING: 'walking',
+	RUNNING: 'running'
+};
+
 // Player is composed of a pivot at the center of the planet and the actual model placed
 // at the surface. This facilitates rotation: rotate the pivot and the model follows
 export default class Player {
@@ -26,9 +32,13 @@ export default class Player {
 		this.radius = height * CONFIG.RADIUS_RATIO;
 
 		this.heading = 0;
-		this.isMoving = false;
 
 		this._setupVisuals();
+
+		// Animation
+		this.state = PLAYER_STATES.IDLE;
+		this.currentAction = null;
+		this.mixer = null;
 
 		// Debugging feature
 		this._axes = new THREE.AxesHelper(1);
@@ -57,8 +67,8 @@ export default class Player {
 		planet.addToSurface(this);
 	}
 
-	update() {
-		this.isMoving = false;
+	update(delta) {
+		if (this.mixer) this._updateAnimation(delta);
 	}
 
 	turn(direction = 1) {
@@ -68,8 +78,9 @@ export default class Player {
 	}
 
 	move(direction = 1) {
-		this.isMoving = true;
-		const moveStep = this.speed * direction;
+		const speed = this.state === PLAYER_STATES.RUNNING ? this.speed * 2 : this.speed;
+
+		const moveStep = speed * direction;
 
 		// Calculate right axis
 		_vector.copy(_right).applyAxisAngle(_up, this.heading);
@@ -80,6 +91,18 @@ export default class Player {
 		// Apply rotation to pivot
 		_quat.setFromAxisAngle(_vector, -moveStep);
 		this.root.quaternion.premultiply(_quat);
+	}
+
+	get isMoving() {
+		return this.state !== PLAYER_STATES.IDLE;
+	}
+
+	setState(state) {
+		this.state = state;
+	}
+
+	resetState() {
+		this.state = PLAYER_STATES.IDLE;
 	}
 
 	activateDebugMode() {
@@ -94,28 +117,56 @@ export default class Player {
 	_setupVisuals() {
 		this.playerModel = new THREE.Group();
 		this.root.add(this.playerModel);
-
 		const loader = new GLTFLoader();
+
 		loader.load('./assets/little-prince.glb', (gltf) => {
 			this.modelRoot = gltf.scene;
-
-			// Scale down — 3.5 blender units, we want roughly player.height tall
 			this.modelRoot.scale.setScalar(this.height / 3.5);
-
-			// Model root is the feet
 			this.modelRoot.position.y = 0;
+			this.modelRoot.rotation.y = Math.PI;
 
-			// Apply toon material to all meshes in the model
 			this.modelRoot.traverse((child) => {
 				if (child.isMesh) {
 					child.material = new THREE.MeshToonMaterial({ color: 0xf5c97a });
 				}
 			});
 
-			this.playerModel.add(this.modelRoot);
+			// Animations
+			this.mixer = new THREE.AnimationMixer(this.modelRoot);
+			this.walkAction = this.mixer.clipAction(gltf.animations[2]);
+			this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
 
-			// Remove placeholder cylinder if it exists
-			if (this.mesh) this.playerModel.remove(this.mesh);
+			this.runAction = this.mixer.clipAction(gltf.animations[1]);
+			this.runAction.setLoop(THREE.LoopRepeat, Infinity);
+
+			this.idleAction = this.mixer.clipAction(gltf.animations[0]);
+			this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
+
+			// Start with idle
+			this.idleAction.play();
+			this.currentAction = this.idleAction;
+
+			this.playerModel.add(this.modelRoot);
 		});
+	}
+
+	_updateAnimation(delta) {
+		if (!this.mixer) return;
+		this.mixer.update(delta);
+
+		const target = this.state === PLAYER_STATES.RUNNING ? this.runAction
+			: this.state === PLAYER_STATES.WALKING ? this.walkAction
+				: this.idleAction;
+
+		if (this.currentAction !== target) {
+			this._switchAnimation(this.currentAction, target);
+		}
+	}
+
+	_switchAnimation(from, to) {
+		if (from == to) return;
+		if (from) from.fadeOut(0.2);
+		to.reset().fadeIn(0.2).play();
+		this.currentAction = to;
 	}
 }
