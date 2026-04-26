@@ -58,13 +58,13 @@ export default class CameraController {
 	}
 
 	_autoCenter() {
-		this.currentYaw += (DEFAULTS.YAW - this.currentYaw) * DEFAULTS.CENTERING_SPEED;
-		this.currentPitch += (DEFAULTS.PITCH - this.currentPitch) * DEFAULTS.CENTERING_SPEED;
+		this.currentYaw += (this.defaultYaw - this.currentYaw) * DEFAULTS.CENTERING_SPEED;
+		this.currentPitch += (this.defaultPitch - this.currentPitch) * DEFAULTS.CENTERING_SPEED;
 
-		if (Math.abs(this.currentYaw - DEFAULTS.YAW) < DEFAULTS.CENTERING_THRESHOLD &&
-			Math.abs(this.currentPitch - DEFAULTS.PITCH) < DEFAULTS.CENTERING_THRESHOLD) {
-			this.currentYaw = DEFAULTS.YAW;
-			this.currentPitch = DEFAULTS.PITCH;
+		if (Math.abs(this.currentYaw - this.defaultYaw) < DEFAULTS.CENTERING_THRESHOLD &&
+			Math.abs(this.currentPitch - this.defaultPitch) < DEFAULTS.CENTERING_THRESHOLD) {
+			this.currentYaw = this.defaultYaw;
+			this.currentPitch = this.defaultPitch;
 			this.isCentering = false;
 		}
 	}

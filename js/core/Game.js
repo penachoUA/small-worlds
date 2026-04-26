@@ -25,7 +25,8 @@ const CAMERA_CONFIGS = {
 		sensitivity: 0.002,
 		minPitch: -1.5,
 		maxPitch: 0.3,
-		autoCenter: true
+		autoCenter: true,
+		pitch: -0.2
 	},
 	[CAMERA_MODES.FIRST_PERSON]: {
 		sensitivity: 0.001,
@@ -89,6 +90,7 @@ export default class Game {
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
 		this.renderer.render(this.scene, this.cameraRig.camera);
+		console.log(this.activeCameraController.currentPitch);
 
 		// Handle debug mode toggling
 		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
@@ -110,8 +112,8 @@ export default class Game {
 		switch (this.cameraMode) {
 			case CAMERA_MODES.THIRD_PERSON:
 				this.player.attachToModel(this.cameraRig);
-				this.cameraRig.setPosition(0, this.player.height * 0.8, 0);
-				this.cameraRig.setCameraPosition(0, this.player.height * 2, this.player.height * 6);
+				this.cameraRig.setPosition(0, this.player.height * 0.01, 0);
+				this.cameraRig.setCameraPosition(0, this.player.height * 1, this.player.height * 2);
 				break;
 
 			case CAMERA_MODES.FIRST_PERSON:
@@ -210,7 +212,7 @@ export default class Game {
 	}
 
 	_initPlayer() {
-		this.player = new Player({ height: 0.1, speed: 0.005 });
+		this.player = new Player({ height: 0.5, speed: 0.005 });
 		this.player.moveToPlanet(this.currentPlanet);
 	}
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const _vector = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
@@ -94,15 +95,27 @@ export default class Player {
 		this.playerModel = new THREE.Group();
 		this.root.add(this.playerModel);
 
-		// Build the model
-		const geometry = new THREE.CylinderGeometry(this.radius, this.radius, this.height);
-		const material = new THREE.MeshToonMaterial({ color: CONFIG.COLOR });
-		this.mesh = new THREE.Mesh(geometry, material);
+		const loader = new GLTFLoader();
+		loader.load('./assets/little-prince.glb', (gltf) => {
+			this.modelRoot = gltf.scene;
 
-		// Move mesh so feet are at surface level
-		this.mesh.position.y = this.height / 2;
+			// Scale down — 3.5 blender units, we want roughly player.height tall
+			this.modelRoot.scale.setScalar(this.height / 3.5);
 
-		this.playerModel.add(this.mesh);
+			// Model root is the feet
+			this.modelRoot.position.y = 0;
+
+			// Apply toon material to all meshes in the model
+			this.modelRoot.traverse((child) => {
+				if (child.isMesh) {
+					child.material = new THREE.MeshToonMaterial({ color: 0xf5c97a });
+				}
+			});
+
+			this.playerModel.add(this.modelRoot);
+
+			// Remove placeholder cylinder if it exists
+			if (this.mesh) this.playerModel.remove(this.mesh);
+		});
 	}
 }
-
