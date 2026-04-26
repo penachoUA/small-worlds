@@ -75,7 +75,6 @@ export default class Game {
 		if (this.cameraMode === CAMERA_MODES.THIRD_PERSON || this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
 			this.playerController.update();
 			this.player.update(delta);
-			this.player.resetState();
 		}
 
 		// Handle camera mode changes
@@ -99,6 +98,7 @@ export default class Game {
 			this._toggleDebugMode();
 		}
 
+		this.player.resetState();
 		this.input.afterUpdate();
 	}
 

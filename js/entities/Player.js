@@ -14,6 +14,15 @@ const CONFIG = {
 	DEFAULT_SPEED: 0.045
 };
 
+const PART_COLORS = [
+	0x37E71F,   // 0 — clothes (green suit)
+	0xE79217,   // 1 — accessories (orange scarf and belt)
+	0xE7DC00,   // 2 — hair (blonde)
+	0x923C00,   // 3 — shoes and buttons (dark brown)
+	0xFFB07E,   // 4 — skin
+	0x000000,   // 5 — eyes (dark)
+];
+
 export const PLAYER_STATES = {
 	IDLE: 'idle',
 	WALKING: 'walking',
@@ -121,13 +130,17 @@ export default class Player {
 
 		loader.load('./assets/little-prince.glb', (gltf) => {
 			this.modelRoot = gltf.scene;
+
 			this.modelRoot.scale.setScalar(this.height / 3.5);
 			this.modelRoot.position.y = 0;
 			this.modelRoot.rotation.y = Math.PI;
 
+			let i = 0;
 			this.modelRoot.traverse((child) => {
 				if (child.isMesh) {
-					child.material = new THREE.MeshToonMaterial({ color: 0xf5c97a });
+					child.material = new THREE.MeshToonMaterial({
+						color: PART_COLORS[i++] ?? 0xffffff
+					});
 				}
 			});
 
