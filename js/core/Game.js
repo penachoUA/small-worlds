@@ -54,7 +54,7 @@ export default class Game {
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
 
-		new Skybox().addTo(scene);
+		this.skybox = new Skybox().addTo(scene);
 		this._initLighting();
 		this._initSystem();
 		this._initPlayer();
@@ -73,6 +73,7 @@ export default class Game {
 		const delta = this.clock.getDelta();
 		const elapsed = this.clock.getElapsedTime();
 
+		this.skybox.update(elapsed);
 		this.star.update(elapsed);
 		this.planets.forEach((p) => p.move());
 
