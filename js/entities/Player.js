@@ -23,6 +23,20 @@ const PART_COLORS = [
 	0x000000,  // eyes
 ];
 
+// Shading
+const SHADE_COLORS = new Uint8Array([0, 128, 255]);
+const GRADIENT_MAP = new THREE.DataTexture(
+	SHADE_COLORS,
+	SHADE_COLORS.length,
+	1,
+	THREE.RedFormat
+);
+
+GRADIENT_MAP.minFilter = THREE.NearestFilter;
+GRADIENT_MAP.magFilter = THREE.NearestFilter;
+GRADIENT_MAP.generateMipmaps = false;
+GRADIENT_MAP.needsUpdate = true;
+
 // Animation timing — tuned to match the jump clip's airborne phase
 const JUMP_ARC_START = 0.25;
 const JUMP_ARC_END = 0.65;
@@ -134,7 +148,8 @@ export default class Player {
 			this.modelRoot.traverse((child) => {
 				if (child.isMesh) {
 					child.material = new THREE.MeshToonMaterial({
-						color: PART_COLORS[i++] ?? 0xffffff
+						color: PART_COLORS[i++] ?? 0xffffff,
+						gradientMap: GRADIENT_MAP
 					});
 				}
 			});

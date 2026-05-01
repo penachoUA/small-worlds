@@ -10,6 +10,20 @@ const CONFIG = {
 	DEBUG_OPACITY: 0.5
 };
 
+// Shading
+const SHADE_COLORS = new Uint8Array([0, 255]);
+const GRADIENT_MAP = new THREE.DataTexture(
+	SHADE_COLORS,
+	SHADE_COLORS.length,
+	1,
+	THREE.RedFormat
+);
+
+GRADIENT_MAP.minFilter = THREE.NearestFilter;
+GRADIENT_MAP.magFilter = THREE.NearestFilter;
+GRADIENT_MAP.generateMipmaps = false;
+GRADIENT_MAP.needsUpdate = true;
+
 export default class Planet {
 	constructor({
 		radius,
@@ -40,7 +54,7 @@ export default class Planet {
 		// Setup visual, mesh is the surface of the planet
 		const geometry = new THREE.SphereGeometry(radius, CONFIG.SPHERE_SEGMENTS, CONFIG.SPHERE_SEGMENTS);
 		const texture = Planet._generateTexture(color1, color2, color3, orbitRadius);
-		const material = new THREE.MeshToonMaterial({ map: texture });
+		const material = new THREE.MeshToonMaterial({ map: texture, gradientMap: GRADIENT_MAP });
 		this.mesh = new THREE.Mesh(geometry, material);
 		this.axisTilt.add(this.mesh);
 

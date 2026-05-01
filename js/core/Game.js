@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { renderer, scene, effect } from './scene.js';
 import Planet from '../entities/Planet.js';
 import Star from '../entities/Star.js';
 import Player from '../entities/Player.js';
@@ -47,10 +48,8 @@ const CAMERA_CONFIGS = {
 };
 
 export default class Game {
-	constructor(scene, renderer, debug = false) {
+	constructor(debug = false) {
 		this.clock = new THREE.Clock();
-		this.scene = scene;
-		this.renderer = renderer;
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
 
@@ -65,7 +64,7 @@ export default class Game {
 		this.debugActive = !debug;
 		this._toggleDebugMode();
 
-		this.renderer.setAnimationLoop(() => this.update());
+		renderer.setAnimationLoop(() => this.update());
 	}
 
 	update() {
@@ -93,7 +92,7 @@ export default class Game {
 
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
-		this.renderer.render(this.scene, this.cameraRig.camera);
+		effect.render(scene, this.cameraRig.camera);
 
 		// Handle debug mode toggling
 		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
@@ -132,7 +131,7 @@ export default class Game {
 				break;
 
 			case CAMERA_MODES.SYSTEM:
-				this.cameraRig.addTo(this.scene);
+				this.cameraRig.addTo(scene);
 				this.cameraRig.setPosition(0, 0, 0);
 				this.cameraRig.setCameraPosition(0, 0, 70);
 				break;
@@ -158,8 +157,8 @@ export default class Game {
 	}
 
 	_initLighting() {
-		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
-		this.scene.add(this.ambientLight);
+		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+		scene.add(this.ambientLight);
 	}
 
 	_initSystem() {
@@ -169,7 +168,7 @@ export default class Game {
 			color: 0xf9a308
 		});
 
-		this.star.addTo(this.scene);
+		this.star.addTo(scene);
 		// Planets
 		this.planets = [
 			new Planet({
@@ -210,7 +209,7 @@ export default class Game {
 			}),
 		];
 
-		this.planets.forEach((p) => p.addTo(this.scene))
+		this.planets.forEach((p) => p.addTo(scene))
 		this.currentPlanet = this.planets[0];
 	}
 
@@ -255,7 +254,7 @@ export default class Game {
 			const height = window.innerHeight;
 			const aspect = width / height;
 
-			this.renderer.setSize(width, height);
+			renderer.setSize(width, height);
 
 			this.cameraRig.camera.aspect = aspect;
 			this.cameraRig.camera.updateProjectionMatrix();
