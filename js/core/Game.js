@@ -7,6 +7,7 @@ import PlayerController from '../controllers/PlayerController.js'
 import CameraController from '../controllers/CameraController.js';
 import CameraRig from '../camera/CameraRig.js';
 import InputHandler from './InputHandler.js';
+import Skybox from './Skybox.js';
 
 const CONTROLS = {
 	CYCLE_CAMERA: 'KeyV',
@@ -53,6 +54,7 @@ export default class Game {
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
 
+		new Skybox().addTo(scene);
 		this._initLighting();
 		this._initSystem();
 		this._initPlayer();
@@ -115,7 +117,7 @@ export default class Game {
 			case CAMERA_MODES.THIRD_PERSON:
 				this.player.attachToModel(this.cameraRig);
 				this.cameraRig.setPosition(0, this.player.height * 0.01, 0);
-				this.cameraRig.setCameraPosition(0, this.player.height * 1, this.player.height * 2);
+				this.cameraRig.setCameraPosition(0, this.player.height * 0.6, this.player.height * 1.3);
 				break;
 
 			case CAMERA_MODES.FIRST_PERSON:
@@ -164,7 +166,7 @@ export default class Game {
 	_initSystem() {
 		// Star
 		this.star = new Star({
-			radius: 4,
+			radius: 8,
 			color: 0xf9a308
 		});
 
@@ -211,7 +213,10 @@ export default class Game {
 
 		this.planets.forEach((p) => p.addTo(scene))
 		this.currentPlanet = this.planets[0];
+		this.planets.forEach((p) => p.rotationSpeed /= 5);
+		this.planets.forEach((p) => p.orbitSpeed /= 5);
 	}
+
 
 	_initPlayer() {
 		this.player = new Player({ height: 0.5, speed: 0.005 });

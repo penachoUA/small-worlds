@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111111);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
