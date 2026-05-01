@@ -70,11 +70,13 @@ export default class Game {
 
 	update() {
 		const delta = this.clock.getDelta();
+		const elapsed = this.clock.getElapsedTime();
+
+		this.star.update(elapsed);
 		this.planets.forEach((p) => p.move());
 
 		if (this.cameraMode === CAMERA_MODES.THIRD_PERSON || this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
-			this.playerController.update();
-			this.player.update(delta);
+			this.playerController.update(delta);
 		}
 
 		// Handle camera mode changes
@@ -98,7 +100,6 @@ export default class Game {
 			this._toggleDebugMode();
 		}
 
-		this.player.resetState();
 		this.input.afterUpdate();
 	}
 
