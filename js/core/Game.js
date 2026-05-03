@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { renderer, scene, effect } from './scene.js';
+import { renderer, scene, initComposer, getComposer } from './scene.js';
 import Planet from '../entities/Planet.js';
 import Star from '../entities/Star.js';
 import Player from '../entities/Player.js';
@@ -53,6 +53,7 @@ export default class Game {
 		this.clock = new THREE.Clock();
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
+		initComposer(this.cameraRig.camera);
 
 		this.skybox = new Skybox().addTo(scene);
 		this._initLighting();
@@ -95,7 +96,7 @@ export default class Game {
 
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
-		effect.render(scene, this.cameraRig.camera);
+		getComposer().render();
 
 		// Handle debug mode toggling
 		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
@@ -261,6 +262,7 @@ export default class Game {
 			const aspect = width / height;
 
 			renderer.setSize(width, height);
+			getComposer().setSize(width, height);
 
 			this.cameraRig.camera.aspect = aspect;
 			this.cameraRig.camera.updateProjectionMatrix();
