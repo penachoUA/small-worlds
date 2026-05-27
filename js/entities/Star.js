@@ -22,7 +22,7 @@ const CONFIG = {
 };
 
 export default class Star {
-	constructor({ radius }) {
+	constructor({ radius, light_intensity }) {
 		this.root = new THREE.Object3D();
 		this.radius = radius;
 		this.noise = new ImprovedNoise();
@@ -43,8 +43,11 @@ export default class Star {
 		this.root.add(this.outerCorona);
 
 		// Light
-		this.light = new THREE.PointLight(CONFIG.LIGHT.COLOR, CONFIG.LIGHT.INTENSITY, 0, CONFIG.LIGHT.DECAY);
+		this.light = new THREE.PointLight(CONFIG.LIGHT.COLOR, light_intensity, 0, CONFIG.LIGHT.DECAY);
 		this.root.add(this.light);
+
+		// Shadows
+		this.light.castShadow = false;
 
 		// Reusable vectors to save memory
 		this.v3 = new THREE.Vector3();

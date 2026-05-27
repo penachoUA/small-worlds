@@ -56,6 +56,7 @@ export default class Planet {
 		const texture = Planet._generateTexture(color1, color2, color3, orbitRadius);
 		const material = new THREE.MeshToonMaterial({ map: texture, gradientMap: GRADIENT_MAP });
 		this.mesh = new THREE.Mesh(geometry, material);
+		this.mesh.receiveShadow = true;
 		this.axisTilt.add(this.mesh);
 
 		this.radius = radius;
@@ -177,7 +178,7 @@ export default class Planet {
 
 	static _generateTexture(color1, color2, color3, seed) {
 		const noise3D = createNoise3D(alea(seed));
-		const size = 1024;
+		const size = 512;
 		const canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;

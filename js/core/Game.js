@@ -9,6 +9,8 @@ import CameraRig from '../camera/CameraRig.js';
 import InputHandler from './InputHandler.js';
 import Skybox from './Skybox.js';
 
+const STAR_INTENSITY = 140;
+
 const CONTROLS = {
 	CYCLE_CAMERA: 'KeyV',
 	PLANET_PREFIX: 'Digit',
@@ -63,6 +65,8 @@ export default class Game {
 		this._initResizeHandler();
 
 		this.setCameraMode('system');
+		this.shadowLight = new THREE.DirectionalLight(0xffffff, 1.0);
+		this._initShadows();
 
 		this.debugActive = !debug;
 		this._toggleDebugMode();
@@ -96,6 +100,11 @@ export default class Game {
 
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
+
+		// Update shadows
+		this._updateShadowLight();
+
+		// Render scene
 		getComposer().render();
 
 		// Handle debug mode toggling
@@ -157,11 +166,12 @@ export default class Game {
 
 		this.currentPlanet = this.planets[planetIndex];
 		this.player.moveToPlanet(this.currentPlanet);
+		this._configureShadowCamera();
 		this.setCameraMode(this.cameraMode); // Refresh the rig parenting
 	}
 
 	_initLighting() {
-		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
 		scene.add(this.ambientLight);
 	}
 
@@ -169,7 +179,7 @@ export default class Game {
 		// Star
 		this.star = new Star({
 			radius: 8,
-			color: 0xf9a308
+			light_intensity: STAR_INTENSITY,
 		});
 
 		this.star.addTo(scene);
@@ -267,6 +277,48 @@ export default class Game {
 			this.cameraRig.camera.aspect = aspect;
 			this.cameraRig.camera.updateProjectionMatrix();
 		})
+	}
+
+	_initShadows() {
+		this.shadowLight = new THREE.DirectionalLight(0xffffff, 0.8);
+		this.shadowLight.castShadow = true;
+		this.shadowLight.shadow.mapSize.set(8192, 8192);
+		this.shadowLight.shadow.normalBias = 0.02;
+		scene.add(this.shadowLight);
+		scene.add(this.shadowLight.target);
+		this._configureShadowCamera();
+	}
+
+	_configureShadowCamera() {
+		if (!this.currentPlanet) return;
+		const r = this.currentPlanet.radius;
+		const cam = this.shadowLight.shadow.camera;
+
+		const s = r * 2;
+		cam.left = -s;
+		cam.right = s;
+		cam.top = s;
+		cam.bottom = -s;
+		cam.near = r * 3;
+		cam.far = r * 7;
+		cam.updateProjectionMatrix();
+	}
+
+	_updateShadowLight() {
+		if (!this.currentPlanet) return;
+		const planetPos = new THREE.Vector3();
+		this.currentPlanet.mesh.getWorldPosition(planetPos);
+		const sunDir = planetPos.clone().normalize();
+		const r = this.currentPlanet.radius;
+
+		this.shadowLight.position.copy(planetPos).addScaledVector(sunDir, -(r * 5));
+		this.shadowLight.target.position.copy(planetPos);
+		this.shadowLight.target.updateMatrixWorld();
+
+		// Match point light intensity at this distance
+		const dist = planetPos.length();
+		const pointLightIntensity = STAR_INTENSITY / (1.5 * dist * dist);
+		this.shadowLight.intensity = pointLightIntensity;
 	}
 
 	_toggleDebugMode() {

@@ -147,6 +147,7 @@ export default class Player {
 			let i = 0;
 			this.modelRoot.traverse((child) => {
 				if (child.isMesh) {
+					child.castShadow = true;
 					child.material = new THREE.MeshToonMaterial({
 						color: PART_COLORS[i++] ?? 0xffffff,
 						gradientMap: GRADIENT_MAP
