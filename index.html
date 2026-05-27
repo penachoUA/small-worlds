@@ -4,26 +4,135 @@
     <meta charset="UTF-8" />
     <title>Small Worlds</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-      }
-      canvas {
-        display: block;
-      }
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    canvas {
+      display: block;
+    }
     </style>
   </head>
   <body>
+    <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; }
+
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: #000a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.8s ease;
+      font-family: Georgia, serif;
+      color: #f0e6d0;
+    }
+
+    #loading-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #loading-screen h1 {
+      font-size: 3rem;
+      letter-spacing: 0.2em;
+      margin-bottom: 0.5rem;
+      color: #f9ea6a;
+    }
+
+    #loading-screen .subtitle {
+      font-size: 1rem;
+      color: #7fc7e4;
+      letter-spacing: 0.3em;
+      margin-bottom: 4rem;
+      text-transform: uppercase;
+    }
+
+    #loading-screen .controls {
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 0.6rem 2rem;
+      margin-bottom: 3rem;
+      font-size: 0.9rem;
+    }
+
+    #loading-screen .controls .key {
+      color: #f9ea6a;
+      text-align: right;
+      font-weight: bold;
+    }
+
+    #loading-screen .controls .desc {
+      color: #c8b89a;
+    }
+
+    #loading-screen .start-btn {
+      padding: 0.8rem 3rem;
+      border: 1px solid #f9ea6a;
+      background: transparent;
+      color: #f9ea6a;
+      font-family: Georgia, serif;
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    #loading-screen .start-btn:hover {
+      background: #f9ea6a;
+      color: #000a1a;
+    }
+
+    #loading-screen .start-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    #loading-screen .loading-text {
+      font-size: 0.8rem;
+      color: #7fc7e4;
+      letter-spacing: 0.2em;
+      margin-top: 1rem;
+      min-height: 1rem;
+    }
+    </style>
+
+    <div id="loading-screen">
+      <h1>Small Worlds</h1>
+      <p class="subtitle">A space exploration experience</p>
+
+      <div class="controls">
+        <span class="key">W A S D</span>
+        <span class="desc">Move</span>
+        <span class="key">Shift</span>
+        <span class="desc">Run</span>
+        <span class="key">Space</span>
+        <span class="desc">Jump</span>
+        <span class="key">Click + Drag</span>
+        <span class="desc">Look around</span>
+        <span class="key">V</span>
+        <span class="desc">Change camera</span>
+        <span class="key">1 2 3</span>
+        <span class="desc">Travel to planet</span>
+      </div>
+
+      <button class="start-btn" id="start-btn" disabled>Loading...</button>
+      <p class="loading-text" id="loading-text">Generating solar system</p>
+    </div>
     <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/",
-          "simplex-noise": "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js",
-          "alea": "https://esm.sh/alea@1.0.1",
-          "jsm/": "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/"
-        }
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.176.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/",
+        "simplex-noise": "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js",
+        "alea": "https://esm.sh/alea@1.0.1",
+        "jsm/": "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/"
       }
+    }
     </script>
     <script type="module" src="js/main.js"></script>
   </body>

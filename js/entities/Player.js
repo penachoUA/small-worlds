@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StateMachine, State } from '../core/Fsm.js';
 
 const _vector = new THREE.Vector3();
@@ -52,7 +51,7 @@ export const PLAYER_STATES = {
 // Player is composed of a pivot (root) at the planet center and a model
 // offset to the surface. Rotating the pivot swings the model across the sphere.
 export default class Player {
-	constructor({ height = CONFIG.DEFAULT_HEIGHT, speed = CONFIG.DEFAULT_SPEED }) {
+	constructor({ height = CONFIG.DEFAULT_HEIGHT, speed = CONFIG.DEFAULT_SPEED, gltf }) {
 		this.root = new THREE.Object3D();
 
 		this.height = height;
@@ -70,8 +69,8 @@ export default class Player {
 		this.currentAction = null;
 
 		this.fsm = new StateMachine(this);
-		this._setupVisuals();
 		this._setupFSM();
+		this._setupVisuals(gltf);
 		this.fsm.set(PLAYER_STATES.IDLE);
 
 		this._axes = new THREE.AxesHelper(1);
@@ -133,56 +132,53 @@ export default class Player {
 		this.fsm.add(PLAYER_STATES.JUMPING, JumpState);
 	}
 
-	_setupVisuals() {
+	_setupVisuals(gltf) {
 		this.playerModel = new THREE.Group();
 		this.root.add(this.playerModel);
 
-		const loader = new GLTFLoader();
-		loader.load('./assets/little-prince.glb', (gltf) => {
-			this.modelRoot = gltf.scene;
-			this.modelRoot.scale.setScalar(this.height / 3.5);
-			this.modelRoot.position.y = 0;
-			this.modelRoot.rotation.y = Math.PI;
+		this.modelRoot = gltf.scene;
+		this.modelRoot.scale.setScalar(this.height / 3.5);
+		this.modelRoot.position.y = 0;
+		this.modelRoot.rotation.y = Math.PI;
 
-			let i = 0;
-			this.modelRoot.traverse((child) => {
-				if (child.isMesh) {
-					child.castShadow = true;
-					child.material = new THREE.MeshToonMaterial({
-						color: PART_COLORS[i++] ?? 0xffffff,
-						gradientMap: GRADIENT_MAP
-					});
-				}
-			});
-
-			this.mixer = new THREE.AnimationMixer(this.modelRoot);
-
-			const idleClip = gltf.animations.find(a => a.name === 'idle');
-			const walkClip = gltf.animations.find(a => a.name === 'walking');
-			const runClip = gltf.animations.find(a => a.name === 'running');
-			const jumpClip = gltf.animations.find(a => a.name === 'jump');
-
-			this.idleAction = this.mixer.clipAction(idleClip);
-			this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
-
-			this.walkAction = this.mixer.clipAction(walkClip);
-			this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
-
-			this.runAction = this.mixer.clipAction(runClip);
-			this.runAction.setLoop(THREE.LoopRepeat, Infinity);
-
-			this.jumpAction = this.mixer.clipAction(jumpClip);
-			this.jumpAction.setLoop(THREE.LoopOnce, 1);
-			this.jumpAction.clampWhenFinished = true;
-			this.jumpAction.timeScale = 1.3;
-			this.jumpDuration = jumpClip.duration / this.jumpAction.timeScale;
-
-			this.fsm.set(PLAYER_STATES.IDLE);
-			this.idleAction.play();
-			this.currentAction = this.idleAction;
-
-			this.playerModel.add(this.modelRoot);
+		let i = 0;
+		this.modelRoot.traverse((child) => {
+			if (child.isMesh) {
+				child.castShadow = true;
+				child.material = new THREE.MeshToonMaterial({
+					color: PART_COLORS[i++] ?? 0xffffff,
+					gradientMap: GRADIENT_MAP
+				});
+			}
 		});
+
+		this.mixer = new THREE.AnimationMixer(this.modelRoot);
+
+		const idleClip = gltf.animations.find(a => a.name === 'idle');
+		const walkClip = gltf.animations.find(a => a.name === 'walking');
+		const runClip = gltf.animations.find(a => a.name === 'running');
+		const jumpClip = gltf.animations.find(a => a.name === 'jump');
+
+		this.idleAction = this.mixer.clipAction(idleClip);
+		this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
+
+		this.walkAction = this.mixer.clipAction(walkClip);
+		this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
+
+		this.runAction = this.mixer.clipAction(runClip);
+		this.runAction.setLoop(THREE.LoopRepeat, Infinity);
+
+		this.jumpAction = this.mixer.clipAction(jumpClip);
+		this.jumpAction.setLoop(THREE.LoopOnce, 1);
+		this.jumpAction.clampWhenFinished = true;
+		this.jumpAction.timeScale = 1.3;
+		this.jumpDuration = jumpClip.duration / this.jumpAction.timeScale;
+
+		this.fsm.set(PLAYER_STATES.IDLE);
+		this.idleAction.play();
+		this.currentAction = this.idleAction;
+
+		this.playerModel.add(this.modelRoot);
 	}
 }
 

@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
 import { renderer, scene, initComposer, getComposer } from './scene.js';
 import Planet from '../entities/Planet.js';
 import Star from '../entities/Star.js';
@@ -51,27 +53,29 @@ const CAMERA_CONFIGS = {
 };
 
 export default class Game {
-	constructor(debug = false) {
+	constructor(onReady = null, debug = false) {
+		this.onReady = onReady;
 		this.clock = new THREE.Clock();
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
 		initComposer(this.cameraRig.camera);
 
-		this.skybox = new Skybox().addTo(scene);
-		this._initLighting();
-		this._initSystem();
-		this._initPlayer();
-		this._initControllers();
-		this._initResizeHandler();
+		this._loadAssets().then(() => {
+			this.skybox = new Skybox().addTo(scene);
+			this._initLighting();
+			this._initSystem();
+			this._initPlayer();
+			this._initControllers();
+			this._initResizeHandler();
+			this._initShadows();
+			this.setCameraMode('system');
 
-		this.setCameraMode('system');
-		this.shadowLight = new THREE.DirectionalLight(0xffffff, 1.0);
-		this._initShadows();
+			this.debugActive = !debug;
+			this._toggleDebugMode();
 
-		this.debugActive = !debug;
-		this._toggleDebugMode();
-
-		renderer.setAnimationLoop(() => this.update());
+			renderer.setAnimationLoop(() => this.update());
+			if (this.onReady) this.onReady();
+		});
 	}
 
 	update() {
@@ -171,6 +175,7 @@ export default class Game {
 	}
 
 	_initLighting() {
+		this.shadowLight = new THREE.DirectionalLight(0xffffff, 1.0);
 		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
 		scene.add(this.ambientLight);
 	}
@@ -231,7 +236,7 @@ export default class Game {
 
 
 	_initPlayer() {
-		this.player = new Player({ height: 0.5, speed: 0.005 });
+		this.player = new Player({ height: 0.5, speed: 0.005, gltf: this.playerGLTF });
 		this.player.moveToPlanet(this.currentPlanet);
 	}
 
@@ -330,6 +335,11 @@ export default class Game {
 			this.planets.forEach(p => p.deactivateDebugMode());
 			this.player.deactivateDebugMode();
 		}
+	}
+
+	async _loadAssets() {
+		const loader = new GLTFLoader();
+		this.playerGLTF = await loader.loadAsync('./assets/little-prince.glb');
 	}
 }
 
