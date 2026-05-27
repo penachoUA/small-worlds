@@ -3,126 +3,270 @@
   <head>
     <meta charset="UTF-8" />
     <title>Small Worlds</title>
+
     <style>
-    * {
-      margin: 0;
-      padding: 0;
-    }
-    canvas {
-      display: block;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Raleway:wght@300;400&display=swap');
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  overflow:hidden;
+  background:#171334;
+}
+
+canvas{
+  display:block;
+}
+
+#loading-screen{
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh;
+
+  /* closer to your in-game sky */
+  background:
+    radial-gradient(circle at 85% 20%,
+    rgba(90,80,150,.20),
+    transparent 35%),
+
+    radial-gradient(circle at 25% 15%,
+    rgba(110,90,180,.15),
+    transparent 45%),
+
+    radial-gradient(circle at 50% 70%,
+    rgba(40,20,100,.25),
+    transparent 40%),
+
+    linear-gradient(
+    180deg,
+    #30254d 0%,
+    #201a4a 40%,
+    #0d0d34 100%
+    );
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Raleway',sans-serif;
+  color:#eee7d5;
+  overflow:hidden;
+  z-index:9999;
+  transition:opacity .8s;
+}
+
+#loading-screen.hidden{
+  opacity:0;
+  pointer-events:none;
+}
+
+.ls-stars{
+  position:absolute;
+  inset:0;
+}
+
+.ls-content{
+    position:relative;
+    z-index:2;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    transform:translateY(-2vh);
+    padding:3rem 4rem;
+    background:rgba(15,15,40,.30);
+    backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:30px;
+    box-shadow:
+        0 0 40px rgba(0,0,0,.25),
+        inset 0 0 30px rgba(255,255,255,.02);
+}
+
+.ls-title{
+  font-family:'Cinzel',serif;
+  font-size:5rem;
+  color:#f3e38b;
+  letter-spacing:.18em;
+  text-shadow:
+    0 0 30px rgba(255,220,100,.3),
+    0 0 60px rgba(255,220,100,.2);
+  margin-bottom:.5rem;
+}
+
+.ls-subtitle{
+    font-size:1.15rem;
+    color:#eef2ff;
+    letter-spacing:.45em;
+    margin-bottom:3rem;
+    text-transform:uppercase;
+    text-shadow: 0px 2px 10px rgba(0,0,0,.7);
+}
+
+.ls-divider{
+  width:180px;
+  height:1px;
+  background:
+    linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,220,100,.8),
+    transparent
+    );
+  margin-bottom:3rem;
+}
+
+.ls-controls{
+    display:grid;
+    grid-template-columns:auto auto;
+    gap:1rem 4rem;
+    margin-bottom:3rem;
+    padding:2rem 3rem;
+    border-radius:18px;
+    background:rgba(10,10,30,.25);
+    border:1px solid rgba(255,255,255,.05);
+}
+
+.ls-key{
+    font-family:'Cinzel';
+    font-size:1.15rem;
+    color:#ffe98a;
+    text-align:right;
+    letter-spacing:.1em;
+    text-shadow: 0px 0px 10px rgba(255,220,100,.4);
+}
+
+.ls-desc{
+
+    font-size:1rem;
+    color:#f0f0f0;
+    font-weight:300;
+    letter-spacing:.08em;
+    text-shadow: 0px 2px 6px rgba(0,0,0,.7);
+}
+
+.ls-divider2{
+  width:120px;
+  height:1px;
+  background:
+    linear-gradient(
+    90deg,
+    transparent,
+    rgba(180,200,255,.6),
+    transparent
+    );
+  margin-bottom:2.5rem;
+}
+
+.ls-btn{
+  font-family:'Cinzel';
+  font-size:1rem;
+  letter-spacing:.25em;
+  color:#f3e38b;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(243,227,139,.6);
+  padding:1rem 4rem;
+  border-radius:10px;
+  transition:.4s;
+}
+
+.ls-btn:not(:disabled):hover{
+  background: rgba(255,220,100,.08);
+  transform: scale(1.04);
+}
+
+.ls-btn:disabled{
+  opacity:.45;
+}
+
+.ls-loading{
+    margin-top:1.2rem;
+    font-size:.9rem;
+    letter-spacing:.3em;
+    color:#d4defe;
+    text-shadow: 0px 2px 8px rgba(0,0,0,.8);
+}
     </style>
   </head>
+
   <body>
-    <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000; }
-
-    #loading-screen {
-      position: fixed;
-      inset: 0;
-      background: #000a1a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      transition: opacity 0.8s ease;
-      font-family: Georgia, serif;
-      color: #f0e6d0;
-    }
-
-    #loading-screen.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #loading-screen h1 {
-      font-size: 3rem;
-      letter-spacing: 0.2em;
-      margin-bottom: 0.5rem;
-      color: #f9ea6a;
-    }
-
-    #loading-screen .subtitle {
-      font-size: 1rem;
-      color: #7fc7e4;
-      letter-spacing: 0.3em;
-      margin-bottom: 4rem;
-      text-transform: uppercase;
-    }
-
-    #loading-screen .controls {
-      display: grid;
-      grid-template-columns: auto auto;
-      gap: 0.6rem 2rem;
-      margin-bottom: 3rem;
-      font-size: 0.9rem;
-    }
-
-    #loading-screen .controls .key {
-      color: #f9ea6a;
-      text-align: right;
-      font-weight: bold;
-    }
-
-    #loading-screen .controls .desc {
-      color: #c8b89a;
-    }
-
-    #loading-screen .start-btn {
-      padding: 0.8rem 3rem;
-      border: 1px solid #f9ea6a;
-      background: transparent;
-      color: #f9ea6a;
-      font-family: Georgia, serif;
-      font-size: 1rem;
-      letter-spacing: 0.2em;
-      cursor: pointer;
-      transition: background 0.3s, color 0.3s;
-    }
-
-    #loading-screen .start-btn:hover {
-      background: #f9ea6a;
-      color: #000a1a;
-    }
-
-    #loading-screen .start-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    #loading-screen .loading-text {
-      font-size: 0.8rem;
-      color: #7fc7e4;
-      letter-spacing: 0.2em;
-      margin-top: 1rem;
-      min-height: 1rem;
-    }
-    </style>
-
     <div id="loading-screen">
-      <h1>Small Worlds</h1>
-      <p class="subtitle">A space exploration experience</p>
+      <canvas class="ls-stars" id="stars"></canvas>
+      <div class="ls-nebula"></div>
 
-      <div class="controls">
-        <span class="key">W A S D</span>
-        <span class="desc">Move</span>
-        <span class="key">Shift</span>
-        <span class="desc">Run</span>
-        <span class="key">Space</span>
-        <span class="desc">Jump</span>
-        <span class="key">Click + Drag</span>
-        <span class="desc">Look around</span>
-        <span class="key">V</span>
-        <span class="desc">Change camera</span>
-        <span class="key">1 2 3</span>
-        <span class="desc">Travel to planet</span>
+      <div class="ls-content">
+        <h1 class="ls-title">Small Worlds</h1>
+        <p class="ls-subtitle">A space exploration experience</p>
+
+        <div class="ls-divider"></div>
+
+        <div class="ls-controls">
+          <span class="ls-key">W A S D</span>
+          <span class="ls-desc">Move</span>
+
+          <span class="ls-key">Shift</span>
+          <span class="ls-desc">Run</span>
+
+          <span class="ls-key">Space</span>
+          <span class="ls-desc">Jump</span>
+
+          <span class="ls-key">Click + Drag</span>
+          <span class="ls-desc">Look around</span>
+
+          <span class="ls-key">V</span>
+          <span class="ls-desc">Change camera</span>
+
+          <span class="ls-key">Numbers (1 2 3...)</span>
+          <span class="ls-desc">Travel to planet</span>
+        </div>
+
+        <div class="ls-divider2"></div>
+
+        <button class="ls-btn" id="start-btn" disabled>Loading...</button>
+        <p class="ls-loading" id="loading-text">Generating solar system</p>
       </div>
-
-      <button class="start-btn" id="start-btn" disabled>Loading...</button>
-      <p class="loading-text" id="loading-text">Generating solar system</p>
     </div>
+
+    <script>
+    const starsCanvas = document.getElementById('stars');
+    const starsCtx = starsCanvas.getContext('2d');
+
+    function resizeStars() {
+      starsCanvas.width = window.innerWidth;
+      starsCanvas.height = window.innerHeight;
+      drawStars();
+    }
+
+    function drawStars() {
+      starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+
+      for (let i = 0; i < 500; i++) {
+        const x = Math.random() * starsCanvas.width;
+        const y = Math.random() * starsCanvas.height;
+        const r = Math.random();
+        const size = r > 0.95 ? 2.5 : r > 0.8 ? 1.5 : 0.8;
+        const type = Math.random();
+
+        starsCtx.fillStyle =
+          type > 0.96
+            ? `rgba(249,234,106,${0.4 + Math.random() * 0.6})`
+            : type > 0.85
+              ? `rgba(127,199,228,${0.4 + Math.random() * 0.6})`
+              : `rgba(255,255,255,${0.2 + Math.random() * 0.7})`;
+
+        starsCtx.beginPath();
+        starsCtx.arc(x, y, size, 0, Math.PI * 2);
+        starsCtx.fill();
+      }
+    }
+
+    resizeStars();
+    window.addEventListener('resize', resizeStars);
+    </script>
+
     <script type="importmap">
     {
       "imports": {
@@ -134,6 +278,7 @@
       }
     }
     </script>
+
     <script type="module" src="js/main.js"></script>
   </body>
 </html>
