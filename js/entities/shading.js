@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 
-const colors = new Uint8Array([0, 255]);
+const colors = new Uint8Array([
+	70,
+	120,
+	185,
+	255
+]);
 
 const gradientMap = new THREE.DataTexture(
 	colors,

@@ -56,7 +56,7 @@ export default class Player {
 
 		this.height = height;
 		this.speed = speed;
-		this.turnSpeed = 2 * speed;
+		this.turnSpeed = 4 * speed;
 		this.radius = height * CONFIG.RADIUS_RATIO;
 		this.heading = 0;
 
@@ -91,7 +91,7 @@ export default class Player {
 		this.root.position.set(0, 0, 0);
 		this.root.quaternion.identity();
 		this.playerModel.position.set(0, planet.radius, 0);
-		planet.addToSurface(this);
+		planet.addPivotToPlanet(this);
 	}
 
 	update(delta, input) {

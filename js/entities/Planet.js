@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { createNoise3D } from 'simplex-noise';
 import alea from 'alea';
 
-
 const CONFIG = {
 	SPHERE_SEGMENTS: 64,
 	ORBIT_LINE_SEGMENTS: 128,
@@ -76,8 +75,26 @@ export default class Planet {
 		return this;
 	}
 
-	addToSurface(object) {
+	addPivotToPlanet(object) {
 		object.addTo(this.mesh);
+	}
+
+	addToSurface(object, direction = new THREE.Vector3(0, 1, 0), sinkFactor = 0) {
+		const normal = direction.clone().normalize();
+		const distance = this.radius * (1 - sinkFactor);
+
+		object.root.position.copy(
+			normal.clone().multiplyScalar(distance)
+		);
+
+		object.root.quaternion.setFromUnitVectors(
+			new THREE.Vector3(0, 1, 0),
+			normal
+		);
+
+		object.addTo(this.mesh);
+
+		return object;
 	}
 
 	move() {
@@ -109,14 +126,11 @@ export default class Planet {
 	}
 
 	_createDebugFeatures() {
-		// Spinning axes — on mesh which only rotates around Y, should be clean now
 		this._spinAxes = new THREE.AxesHelper(this.radius + CONFIG.AXES_SIZE);
 		this.mesh.add(this._spinAxes);
 
-		// Surface grid — on mesh so it stays fixed relative to player
 		this._createSurfaceGrid();
 
-		// Orbit path — on root so it inherits orbital inclination
 		this._createOrbitPath();
 		this.root.add(this.orbitPath);
 	}

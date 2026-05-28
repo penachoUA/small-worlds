@@ -11,6 +11,9 @@ import CameraRig from '../camera/CameraRig.js';
 import InputHandler from './InputHandler.js';
 import Skybox from './Skybox.js';
 
+import Tree from '../entities/props/Tree.js';
+import Windmill from '../entities/props/Windmill.js';
+
 const STAR_INTENSITY = 140;
 
 const CONTROLS = {
@@ -54,6 +57,7 @@ const CAMERA_CONFIGS = {
 
 export default class Game {
 	constructor(onReady = null, debug = false) {
+		this.animatedProps = [];
 		this.onReady = onReady;
 		this.clock = new THREE.Clock();
 		this.input = new InputHandler();
@@ -105,6 +109,11 @@ export default class Game {
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
 
+		// Update props animations
+		this.animatedProps?.forEach((prop) => {
+			prop.update?.(delta);
+		});
+
 		// Update shadows
 		this._updateShadowLight();
 
@@ -142,7 +151,7 @@ export default class Game {
 				break;
 
 			case CAMERA_MODES.PLANET:
-				this.currentPlanet.addToSurface(this.cameraRig);
+				this.currentPlanet.addPivotToPlanet(this.cameraRig);
 				this.cameraRig.setPosition(0, 0, 0);
 				this.cameraRig.setCameraPosition(0, 0, this.currentPlanet.radius * 2);
 				break;
@@ -196,10 +205,10 @@ export default class Game {
 				color2: 0x8b1a00,  // deep red rock
 				color3: 0xff4500,  // bright lava
 				orbitRadius: 13,
-				orbitSpeed: 0.021,
+				orbitSpeed: 0.0042,
 				orbitAngle: 2,
 				orbitInclination: -10,
-				rotationSpeed: 0.022,
+				rotationSpeed: 0.0044,
 				rotationAxis: 23
 			}),
 			new Planet({
@@ -208,10 +217,10 @@ export default class Game {
 				color2: 0x60c8e8,  // bright ice blue
 				color3: 0xf0f8ff,  // white snow
 				orbitRadius: 25,
-				orbitSpeed: 0.013,
+				orbitSpeed: 0.0026,
 				orbitAngle: 4,
 				orbitInclination: 20,
-				rotationSpeed: 0.012,
+				rotationSpeed: 0.0024,
 				rotationAxis: 7
 			}),
 			new Planet({
@@ -220,18 +229,18 @@ export default class Game {
 				color2: 0x4caf50,  // mid green land
 				color3: 0xc8d97a,  // dry/sandy highlands
 				orbitRadius: 50,
-				orbitSpeed: 0.012,
+				orbitSpeed: 0.0024,
 				orbitAngle: 0,
 				orbitInclination: 15,
-				rotationSpeed: 0.01,
+				rotationSpeed: 0.002,
 				rotationAxis: 12
 			}),
 		];
 
+		this._initPlanetObjects();
+
 		this.planets.forEach((p) => p.addTo(scene))
 		this.currentPlanet = this.planets[0];
-		this.planets.forEach((p) => p.rotationSpeed /= 5);
-		this.planets.forEach((p) => p.orbitSpeed /= 5);
 	}
 
 
@@ -339,7 +348,47 @@ export default class Game {
 
 	async _loadAssets() {
 		const loader = new GLTFLoader();
+
 		this.playerGLTF = await loader.loadAsync('./assets/little-prince.glb');
+	}
+
+	_initPlanetObjects() {
+		const greenPlanet = this.planets[2];
+
+		const tallWindmill = new Windmill({
+			height: 1.7,
+			width: 1.0,
+			spinSpeed: 1.0
+		});
+
+		const shortWindmill = new Windmill({
+			height: 1.25,
+			width: 1.25,
+			spinSpeed: 0.65,
+			bodyColor: 0xcdbb91,
+			roofColor: 0x9f2f2f
+		});
+
+		greenPlanet.addToSurface(
+			tallWindmill,
+			new THREE.Vector3(-0.62, 1, 0.18),
+			0.026
+		);
+
+		greenPlanet.addToSurface(
+			shortWindmill,
+			new THREE.Vector3(0.88, 0.72, -0.52),
+			0.026
+		);
+
+		tallWindmill.root.scale.setScalar(0.48);
+		tallWindmill.root.rotateY(0.65);
+
+		shortWindmill.root.scale.setScalar(0.36);
+		shortWindmill.root.rotateY(-1.85);
+
+		this.animatedProps.push(tallWindmill);
+		this.animatedProps.push(shortWindmill);
 	}
 }
 
