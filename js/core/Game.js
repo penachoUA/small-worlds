@@ -243,11 +243,11 @@ export default class Game {
 
 		this._addPlanet(
 			new Planet({
-				name: 'ice',
+				name: 'green',
 				radius: 1.5,
-				color1: 0x1a3a6e,
-				color2: 0x60c8e8,
-				color3: 0xf0f8ff,
+				color1: 0x1a6b2e,
+				color2: 0x4caf50,
+				color3: 0xc8d97a,
 				orbitRadius: 25,
 				orbitSpeed: 0.0026,
 				orbitAngle: 4,
@@ -259,11 +259,11 @@ export default class Game {
 
 		this._addPlanet(
 			new Planet({
-				name: 'green',
+				name: 'ice',
 				radius: 2,
-				color1: 0x1a6b2e,
-				color2: 0x4caf50,
-				color3: 0xc8d97a,
+				color1: 0x1a3a6e,
+				color2: 0x60c8e8,
+				color3: 0xf0f8ff,
 				orbitRadius: 50,
 				orbitSpeed: 0.0024,
 				orbitAngle: 0,
