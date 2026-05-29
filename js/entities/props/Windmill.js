@@ -21,17 +21,16 @@ export default class Windmill {
 		this.width = width;
 		this.spinSpeed = spinSpeed;
 
-		this.materials = {
-			body: new THREE.MeshToonMaterial({ color: bodyColor, gradientMap }),
-			roof: new THREE.MeshToonMaterial({ color: roofColor, gradientMap }),
-			blade: new THREE.MeshToonMaterial({ color: bladeColor, gradientMap }),
-			wood: new THREE.MeshToonMaterial({ color: woodColor, gradientMap }),
-			stone: new THREE.MeshToonMaterial({ color: stoneColor, gradientMap }),
-			window: new THREE.MeshToonMaterial({ color: windowColor, gradientMap }),
-			darkWindow: new THREE.MeshToonMaterial({ color: 0x24506b, gradientMap }),
-			doorInset: new THREE.MeshToonMaterial({ color: 0x5a351b, gradientMap }),
-		};
+		this.materials = this._createMaterials({
+			bodyColor,
+			roofColor,
+			bladeColor,
+			woodColor,
+			stoneColor,
+			windowColor
+		});
 
+		this._computeLayout();
 		this._createModel();
 	}
 
@@ -41,14 +40,112 @@ export default class Windmill {
 	}
 
 	update(delta) {
-		if (this.blades) {
-			this.blades.rotation.z += delta * this.spinSpeed;
-		}
+		this.blades.rotation.z += delta * this.spinSpeed;
+	}
+
+	_createMaterials({
+		bodyColor,
+		roofColor,
+		bladeColor,
+		woodColor,
+		stoneColor,
+		windowColor
+	}) {
+		return {
+			body: this._toon(bodyColor),
+			roof: this._toon(roofColor),
+			blade: this._toon(bladeColor),
+			wood: this._toon(woodColor),
+			stone: this._toon(stoneColor),
+			window: this._toon(windowColor),
+			darkWindow: this._toon(0x24506b),
+			doorInset: this._toon(0x5a351b),
+		};
+	}
+
+	_toon(color) {
+		return new THREE.MeshToonMaterial({
+			color,
+			gradientMap
+		});
+	}
+
+	_computeLayout() {
+		const h = this.height;
+		const w = this.width;
+
+		const baseLowerHeight = h * 0.13;
+		const baseMiddleHeight = h * 0.075;
+		const baseUpperHeight = h * 0.05;
+
+		const bodyBottomY = h * 0.20;
+		const bodyHeight = h * 0.54;
+		const bodyTopY = bodyBottomY + bodyHeight;
+
+		const roofHeight = h * 0.22;
+		const roofRimY = bodyTopY + h * 0.025;
+
+		this.layout = {
+			base: {
+				lowerHeight: baseLowerHeight,
+				middleHeight: baseMiddleHeight,
+				upperHeight: baseUpperHeight,
+
+				lowerY: baseLowerHeight * 0.15,
+				middleY: h * 0.13,
+				upperY: h * 0.19,
+
+				lowerTopRadius: w * 0.45,
+				lowerBottomRadius: w * 0.52,
+				middleTopRadius: w * 0.40,
+				middleBottomRadius: w * 0.46,
+				upperTopRadius: w * 0.34,
+				upperBottomRadius: w * 0.39,
+			},
+
+			body: {
+				bottomY: bodyBottomY,
+				centerY: bodyBottomY + bodyHeight / 2,
+				topY: bodyTopY,
+				height: bodyHeight,
+				bottomRadius: w * 0.38,
+				topRadius: w * 0.27,
+			},
+
+			roof: {
+				rimY: roofRimY,
+				centerY: roofRimY + roofHeight * 0.52,
+				capY: roofRimY + roofHeight + h * 0.015,
+				height: roofHeight,
+				radius: w * 0.45,
+			},
+
+			blades: {
+				hubY: bodyBottomY + bodyHeight * 0.78,
+				radius: w * 0.52,
+				hubRadius: w * 0.06,
+				mountLength: w * 0.14,
+			}
+		};
+	}
+
+	_bodyRadiusAt(y) {
+		const body = this.layout.body;
+
+		const t = THREE.MathUtils.clamp(
+			(y - body.bottomY) / body.height,
+			0,
+			1
+		);
+
+		return THREE.MathUtils.lerp(
+			body.bottomRadius,
+			body.topRadius,
+			t
+		);
 	}
 
 	_createModel() {
-		this._computeLayout();
-
 		this._createBase();
 		this._createBody();
 		this._createRoof();
@@ -58,267 +155,212 @@ export default class Windmill {
 		this._createBladeAssembly();
 	}
 
-	_computeLayout() {
-		const h = this.height;
-		const w = this.width;
-
-		this.layout = {
-			baseLowerHeight: h * 0.13,
-			baseMiddleHeight: h * 0.075,
-			baseUpperHeight: h * 0.05,
-
-			baseLowerRadiusBottom: w * 0.52,
-			baseLowerRadiusTop: w * 0.45,
-			baseMiddleRadiusBottom: w * 0.46,
-			baseMiddleRadiusTop: w * 0.40,
-			baseUpperRadiusBottom: w * 0.39,
-			baseUpperRadiusTop: w * 0.34,
-
-			bodyBottomY: h * 0.20,
-			bodyHeight: h * 0.54,
-			bodyBottomRadius: w * 0.38,
-			bodyTopRadius: w * 0.27,
-
-			roofHeight: h * 0.22,
-			roofRadius: w * 0.45,
-
-			bladeRadius: w * 0.52,
-			bladeHubRadius: w * 0.06,
-			mountLength: w * 0.14,
-		};
-
-		this.layout.bodyCenterY =
-			this.layout.bodyBottomY + this.layout.bodyHeight / 2;
-
-		this.layout.bodyTopY =
-			this.layout.bodyBottomY + this.layout.bodyHeight;
-
-		this.layout.roofRimY =
-			this.layout.bodyTopY + h * 0.025;
-
-		this.layout.roofCenterY =
-			this.layout.roofRimY + this.layout.roofHeight * 0.52;
-
-		this.layout.roofCapY =
-			this.layout.roofRimY + this.layout.roofHeight;
-
-		this.layout.hubY =
-			this.layout.bodyBottomY + this.layout.bodyHeight * 0.78;
-	}
-
-	_bodyRadiusAt(y) {
-		const l = this.layout;
-
-		const t = THREE.MathUtils.clamp(
-			(y - l.bodyBottomY) / l.bodyHeight,
-			0,
-			1
-		);
-
-		return THREE.MathUtils.lerp(
-			l.bodyBottomRadius,
-			l.bodyTopRadius,
-			t
-		);
-	}
-
-	_createMesh(geometry, material, position = new THREE.Vector3()) {
+	_mesh(geometry, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
 		const mesh = new THREE.Mesh(geometry, material);
-		mesh.position.copy(position);
+
+		mesh.position.set(...position);
+		mesh.rotation.set(...rotation);
+
 		mesh.castShadow = true;
 		mesh.receiveShadow = true;
+
+		return mesh;
+	}
+
+	_box(size, material, position, rotation) {
+		return this._mesh(
+			new THREE.BoxGeometry(...size),
+			material,
+			position,
+			rotation
+		);
+	}
+
+	_cylinder({
+		radiusTop,
+		radiusBottom = radiusTop,
+		height,
+		segments = 12,
+		material,
+		position = [0, 0, 0],
+		rotation = [0, 0, 0]
+	}) {
+		return this._mesh(
+			new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+			material,
+			position,
+			rotation
+		);
+	}
+
+	_cone({
+		radius,
+		height,
+		segments = 8,
+		material,
+		position = [0, 0, 0],
+		rotation = [0, 0, 0]
+	}) {
+		return this._mesh(
+			new THREE.ConeGeometry(radius, height, segments),
+			material,
+			position,
+			rotation
+		);
+	}
+
+	_sphere({
+		radius,
+		widthSegments = 8,
+		heightSegments = 8,
+		material,
+		position = [0, 0, 0]
+	}) {
+		return this._mesh(
+			new THREE.SphereGeometry(radius, widthSegments, heightSegments),
+			material,
+			position
+		);
+	}
+
+	_add(mesh) {
+		this.root.add(mesh);
 		return mesh;
 	}
 
 	_createBase() {
-		const l = this.layout;
+		const base = this.layout.base;
 
-		/*
-			The lower base extends a little below y = 0.
-			This gives Planet.addToSurface(..., sinkFactor) something safe to bury.
-		*/
-		const lowerBase = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.baseLowerRadiusTop,
-				l.baseLowerRadiusBottom,
-				l.baseLowerHeight,
-				8
-			),
-			this.materials.stone,
-			new THREE.Vector3(0, l.baseLowerHeight * 0.15, 0)
-		);
+		this._add(this._cylinder({
+			radiusTop: base.lowerTopRadius,
+			radiusBottom: base.lowerBottomRadius,
+			height: base.lowerHeight,
+			segments: 8,
+			material: this.materials.stone,
+			position: [0, base.lowerY, 0]
+		}));
 
-		this.root.add(lowerBase);
+		this._add(this._cylinder({
+			radiusTop: base.middleTopRadius,
+			radiusBottom: base.middleBottomRadius,
+			height: base.middleHeight,
+			segments: 8,
+			material: this.materials.stone,
+			position: [0, base.middleY, 0]
+		}));
 
-		const middleBase = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.baseMiddleRadiusTop,
-				l.baseMiddleRadiusBottom,
-				l.baseMiddleHeight,
-				8
-			),
-			this.materials.stone,
-			new THREE.Vector3(0, this.height * 0.13, 0)
-		);
-
-		this.root.add(middleBase);
-
-		const upperBase = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.baseUpperRadiusTop,
-				l.baseUpperRadiusBottom,
-				l.baseUpperHeight,
-				8
-			),
-			this.materials.stone,
-			new THREE.Vector3(0, this.height * 0.19, 0)
-		);
-
-		this.root.add(upperBase);
+		this._add(this._cylinder({
+			radiusTop: base.upperTopRadius,
+			radiusBottom: base.upperBottomRadius,
+			height: base.upperHeight,
+			segments: 8,
+			material: this.materials.stone,
+			position: [0, base.upperY, 0]
+		}));
 	}
 
 	_createBody() {
-		const l = this.layout;
+		const body = this.layout.body;
+		const h = this.height;
 
-		const body = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.bodyTopRadius,
-				l.bodyBottomRadius,
-				l.bodyHeight,
-				6
-			),
-			this.materials.body,
-			new THREE.Vector3(0, l.bodyCenterY, 0)
-		);
+		this._add(this._cylinder({
+			radiusTop: body.topRadius,
+			radiusBottom: body.bottomRadius,
+			height: body.height,
+			segments: 6,
+			material: this.materials.body,
+			position: [0, body.centerY, 0],
+			rotation: [0, Math.PI / 6, 0]
+		}));
 
-		body.rotation.y = Math.PI / 6;
-		this.root.add(body);
+		this._add(this._cylinder({
+			radiusTop: body.bottomRadius * 1.08,
+			radiusBottom: body.bottomRadius * 1.12,
+			height: h * 0.03,
+			segments: 6,
+			material: this.materials.wood,
+			position: [0, body.bottomY + h * 0.02, 0],
+			rotation: [0, Math.PI / 6, 0]
+		}));
 
-		const bottomTrim = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.bodyBottomRadius * 1.08,
-				l.bodyBottomRadius * 1.12,
-				this.height * 0.03,
-				6
-			),
-			this.materials.wood,
-			new THREE.Vector3(0, l.bodyBottomY + this.height * 0.02, 0)
-		);
-
-		bottomTrim.rotation.y = Math.PI / 6;
-		this.root.add(bottomTrim);
-
-		const topTrim = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.bodyTopRadius * 1.12,
-				l.bodyTopRadius * 1.16,
-				this.height * 0.035,
-				6
-			),
-			this.materials.wood,
-			new THREE.Vector3(0, l.bodyTopY, 0)
-		);
-
-		topTrim.rotation.y = Math.PI / 6;
-		this.root.add(topTrim);
+		this._add(this._cylinder({
+			radiusTop: body.topRadius * 1.12,
+			radiusBottom: body.topRadius * 1.16,
+			height: h * 0.035,
+			segments: 6,
+			material: this.materials.wood,
+			position: [0, body.topY, 0],
+			rotation: [0, Math.PI / 6, 0]
+		}));
 	}
 
 	_createRoof() {
-		const l = this.layout;
+		const roof = this.layout.roof;
+		const h = this.height;
 
-		const roofRim = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.roofRadius * 0.98,
-				l.roofRadius,
-				this.height * 0.035,
-				6
-			),
-			this.materials.wood,
-			new THREE.Vector3(0, l.roofRimY, 0)
-		);
+		this._add(this._cylinder({
+			radiusTop: roof.radius * 0.98,
+			radiusBottom: roof.radius,
+			height: h * 0.035,
+			segments: 6,
+			material: this.materials.wood,
+			position: [0, roof.rimY, 0],
+			rotation: [0, Math.PI / 6, 0]
+		}));
 
-		roofRim.rotation.y = Math.PI / 6;
-		this.root.add(roofRim);
+		this._add(this._cone({
+			radius: roof.radius,
+			height: roof.height,
+			segments: 6,
+			material: this.materials.roof,
+			position: [0, roof.centerY, 0],
+			rotation: [0, Math.PI / 6, 0]
+		}));
 
-		const roof = this._createMesh(
-			new THREE.ConeGeometry(
-				l.roofRadius,
-				l.roofHeight,
-				6
-			),
-			this.materials.roof,
-			new THREE.Vector3(0, l.roofCenterY, 0)
-		);
-
-		roof.rotation.y = Math.PI / 6;
-		this.root.add(roof);
-
-		const roofCap = this._createMesh(
-			new THREE.SphereGeometry(this.width * 0.055, 8, 8),
-			this.materials.roof,
-			new THREE.Vector3(0, l.roofCapY + this.height * 0.015, 0)
-		);
-
-		this.root.add(roofCap);
+		this._add(this._sphere({
+			radius: this.width * 0.055,
+			material: this.materials.roof,
+			position: [0, roof.capY, 0]
+		}));
 	}
 
 	_createDoor() {
-		const l = this.layout;
+		const body = this.layout.body;
+		const h = this.height;
+		const w = this.width;
 
-		const doorWidth = this.width * 0.18;
-		const doorRectHeight = this.height * 0.15;
-		const doorRadius = doorWidth / 2;
+		const doorWidth = w * 0.18;
+		const doorRectHeight = h * 0.15;
+		const doorY = body.bottomY + h * 0.035;
+		const frontZ = this._bodyRadiusAt(body.bottomY + h * 0.12);
 
-		const doorY = l.bodyBottomY + this.height * 0.035;
-		const doorCenterY = doorY;
-		const frontZ = this._bodyRadiusAt(l.bodyBottomY + this.height * 0.12);
+		this._add(this._archedPanel({
+			width: doorWidth,
+			rectHeight: doorRectHeight,
+			material: this.materials.wood,
+			position: [0, doorY, frontZ + 0.012]
+		}));
 
-		const doorShape = this._createArchedShape(
-			doorWidth,
-			doorRectHeight,
-			doorRadius
-		);
+		this._add(this._archedPanel({
+			width: doorWidth * 0.66,
+			rectHeight: doorRectHeight * 0.72,
+			material: this.materials.doorInset,
+			position: [0, doorY + h * 0.025, frontZ + 0.019]
+		}));
 
-		const door = this._createMesh(
-			new THREE.ShapeGeometry(doorShape),
-			this.materials.wood,
-			new THREE.Vector3(0, doorCenterY, frontZ + 0.012)
-		);
-
-		this.root.add(door);
-
-		const insetWidth = doorWidth * 0.66;
-		const insetRectHeight = doorRectHeight * 0.72;
-		const insetRadius = insetWidth / 2;
-
-		const insetShape = this._createArchedShape(
-			insetWidth,
-			insetRectHeight,
-			insetRadius
-		);
-
-		const inset = this._createMesh(
-			new THREE.ShapeGeometry(insetShape),
-			this.materials.doorInset,
-			new THREE.Vector3(0, doorCenterY + this.height * 0.025, frontZ + 0.019)
-		);
-
-		this.root.add(inset);
-
-		const knob = this._createMesh(
-			new THREE.SphereGeometry(this.width * 0.012, 8, 8),
-			this.materials.roof,
-			new THREE.Vector3(
+		this._add(this._sphere({
+			radius: w * 0.012,
+			material: this.materials.roof,
+			position: [
 				doorWidth * 0.28,
-				doorCenterY + doorRectHeight * 0.42,
+				doorY + doorRectHeight * 0.42,
 				frontZ + 0.03
-			)
-		);
-
-		this.root.add(knob);
+			]
+		}));
 	}
 
-	_createArchedShape(width, rectHeight, radius) {
+	_archedPanel({ width, rectHeight, material, position }) {
+		const radius = width / 2;
 		const shape = new THREE.Shape();
 
 		shape.moveTo(-width / 2, 0);
@@ -336,158 +378,142 @@ export default class Windmill {
 
 		shape.lineTo(-width / 2, 0);
 
-		return shape;
+		return this._mesh(
+			new THREE.ShapeGeometry(shape),
+			material,
+			position
+		);
 	}
 
 	_createWindows() {
-		const l = this.layout;
+		const body = this.layout.body;
+		const h = this.height;
+		const w = this.width;
 
-		const frontWindowY = l.bodyBottomY + l.bodyHeight * 0.58;
+		const frontWindowY = body.bottomY + body.height * 0.58;
 		const frontWindowZ = this._bodyRadiusAt(frontWindowY);
 
-		const frameRadius = this.width * 0.085;
-		const glassRadius = this.width * 0.058;
+		this._add(this._cylinder({
+			radiusTop: w * 0.085,
+			height: w * 0.012,
+			segments: 16,
+			material: this.materials.wood,
+			position: [0, frontWindowY, frontWindowZ + 0.012],
+			rotation: [Math.PI / 2, 0, 0]
+		}));
 
-		const frontWindowFrame = this._createMesh(
-			new THREE.CylinderGeometry(frameRadius, frameRadius, this.width * 0.012, 16),
+		this._add(this._cylinder({
+			radiusTop: w * 0.058,
+			height: w * 0.014,
+			segments: 16,
+			material: this.materials.window,
+			position: [0, frontWindowY, frontWindowZ + 0.021],
+			rotation: [Math.PI / 2, 0, 0]
+		}));
+
+		this._add(this._box(
+			[w * 0.012, h * 0.065, w * 0.006],
 			this.materials.wood,
-			new THREE.Vector3(0, frontWindowY, frontWindowZ + 0.012)
-		);
+			[0, frontWindowY, frontWindowZ + 0.031]
+		));
 
-		frontWindowFrame.rotation.x = Math.PI / 2;
-		this.root.add(frontWindowFrame);
-
-		const frontWindowGlass = this._createMesh(
-			new THREE.CylinderGeometry(glassRadius, glassRadius, this.width * 0.014, 16),
-			this.materials.window,
-			new THREE.Vector3(0, frontWindowY, frontWindowZ + 0.021)
-		);
-
-		frontWindowGlass.rotation.x = Math.PI / 2;
-		this.root.add(frontWindowGlass);
-
-		const verticalBar = this._createMesh(
-			new THREE.BoxGeometry(this.width * 0.012, this.height * 0.065, this.width * 0.006),
+		this._add(this._box(
+			[w * 0.11, h * 0.008, w * 0.006],
 			this.materials.wood,
-			new THREE.Vector3(0, frontWindowY, frontWindowZ + 0.031)
-		);
+			[0, frontWindowY, frontWindowZ + 0.032]
+		));
 
-		this.root.add(verticalBar);
+		const sideWindowY = body.bottomY + body.height * 0.45;
 
-		const horizontalBar = this._createMesh(
-			new THREE.BoxGeometry(this.width * 0.11, this.height * 0.008, this.width * 0.006),
-			this.materials.wood,
-			new THREE.Vector3(0, frontWindowY, frontWindowZ + 0.032)
-		);
-
-		this.root.add(horizontalBar);
-
-		const sideWindowY = l.bodyBottomY + l.bodyHeight * 0.45;
-
-		const leftWindow = this._createMesh(
-			new THREE.BoxGeometry(this.width * 0.095, this.height * 0.065, this.width * 0.01),
+		this._add(this._box(
+			[w * 0.095, h * 0.065, w * 0.01],
 			this.materials.darkWindow,
-			new THREE.Vector3(-this.width * 0.245, sideWindowY, this.width * 0.105)
-		);
+			[-w * 0.245, sideWindowY, w * 0.105],
+			[0, -Math.PI / 3, 0]
+		));
 
-		leftWindow.rotation.y = -Math.PI / 3;
-		this.root.add(leftWindow);
-
-		const rightWindow = this._createMesh(
-			new THREE.BoxGeometry(this.width * 0.095, this.height * 0.065, this.width * 0.01),
+		this._add(this._box(
+			[w * 0.095, h * 0.065, w * 0.01],
 			this.materials.darkWindow,
-			new THREE.Vector3(this.width * 0.245, sideWindowY, this.width * 0.105)
-		);
-
-		rightWindow.rotation.y = Math.PI / 3;
-		this.root.add(rightWindow);
+			[w * 0.245, sideWindowY, w * 0.105],
+			[0, Math.PI / 3, 0]
+		));
 	}
 
 	_createBeams() {
-		const beamY = this.layout.bodyBottomY + this.layout.bodyHeight * 0.47;
+		const h = this.height;
+		const w = this.width;
+		const y = this.layout.body.bottomY + this.layout.body.height * 0.47;
 
-		const beamConfigs = [
-			{ x: -this.width * 0.18, z: this.width * 0.31, rotZ: 0.18 },
-			{ x: this.width * 0.18, z: this.width * 0.31, rotZ: -0.18 },
+		const beams = [
+			{ x: -w * 0.18, z: w * 0.31, rotZ: 0.18 },
+			{ x: w * 0.18, z: w * 0.31, rotZ: -0.18 },
 		];
 
-		beamConfigs.forEach((config) => {
-			const beam = this._createMesh(
-				new THREE.BoxGeometry(
-					this.width * 0.045,
-					this.height * 0.50,
-					this.width * 0.045
-				),
+		beams.forEach(({ x, z, rotZ }) => {
+			this._add(this._box(
+				[w * 0.045, h * 0.50, w * 0.045],
 				this.materials.wood,
-				new THREE.Vector3(config.x, beamY, config.z)
-			);
-
-			beam.rotation.z = config.rotZ;
-			this.root.add(beam);
+				[x, y, z],
+				[0, 0, rotZ]
+			));
 		});
 	}
 
 	_createBladeAssembly() {
-		const l = this.layout;
-
-		const hubY = l.hubY;
+		const blade = this.layout.blades;
+		const hubY = blade.hubY;
 		const wallZ = this._bodyRadiusAt(hubY);
 
 		const hubGroup = new THREE.Object3D();
 
-		/*
-			Critical fix:
-			The rear mount is centered so that its back end touches the wall.
-			This prevents the blade mast from floating in front of the windmill.
-		*/
 		hubGroup.position.set(
 			0,
 			hubY,
-			wallZ + l.mountLength / 2
+			wallZ + blade.mountLength / 2
 		);
 
-		const rearMount = this._createMesh(
-			new THREE.CylinderGeometry(
-				this.width * 0.075,
-				this.width * 0.075,
-				l.mountLength,
-				12
-			),
-			this.materials.wood
-		);
+		const rearMount = this._cylinder({
+			radiusTop: this.width * 0.075,
+			height: blade.mountLength,
+			segments: 12,
+			material: this.materials.wood,
+			rotation: [Math.PI / 2, 0, 0]
+		});
 
-		rearMount.rotation.x = Math.PI / 2;
 		hubGroup.add(rearMount);
 
 		this.blades = new THREE.Object3D();
-		this.blades.position.set(0, 0, l.mountLength / 2 + this.width * 0.02);
+		this.blades.position.set(
+			0,
+			0,
+			blade.mountLength / 2 + this.width * 0.02
+		);
 
 		for (let i = 0; i < 4; i++) {
-			const blade = this._createBlade();
-			blade.rotation.z = i * Math.PI / 2;
-			this.blades.add(blade);
+			const bladePart = this._createBlade();
+			bladePart.rotation.z = i * Math.PI / 2;
+			this.blades.add(bladePart);
 		}
 
-		const hub = this._createMesh(
-			new THREE.CylinderGeometry(
-				l.bladeHubRadius,
-				l.bladeHubRadius,
-				this.width * 0.07,
-				12
-			),
-			this.materials.wood,
-			new THREE.Vector3(0, 0, this.width * 0.035)
-		);
+		const hub = this._cylinder({
+			radiusTop: blade.hubRadius,
+			height: this.width * 0.07,
+			segments: 12,
+			material: this.materials.wood,
+			position: [0, 0, this.width * 0.035],
+			rotation: [Math.PI / 2, 0, 0]
+		});
 
-		hub.rotation.x = Math.PI / 2;
+		const nose = this._sphere({
+			radius: this.width * 0.055,
+			widthSegments: 10,
+			heightSegments: 10,
+			material: this.materials.roof,
+			position: [0, 0, this.width * 0.085]
+		});
+
 		this.blades.add(hub);
-
-		const nose = this._createMesh(
-			new THREE.SphereGeometry(this.width * 0.055, 10, 10),
-			this.materials.roof,
-			new THREE.Vector3(0, 0, this.width * 0.085)
-		);
-
 		this.blades.add(nose);
 
 		hubGroup.add(this.blades);
@@ -495,55 +521,32 @@ export default class Windmill {
 	}
 
 	_createBlade() {
+		const h = this.height;
+		const w = this.width;
+		const bladeRadius = this.layout.blades.radius;
+
 		const bladeGroup = new THREE.Object3D();
 
-		const armLength = this.layout.bladeRadius;
-		const armWidth = this.width * 0.035;
-
-		const arm = this._createMesh(
-			new THREE.BoxGeometry(
-				armWidth,
-				armLength,
-				this.width * 0.025
-			),
+		bladeGroup.add(this._box(
+			[w * 0.035, bladeRadius, w * 0.025],
 			this.materials.wood,
-			new THREE.Vector3(0, armLength * 0.5, 0)
-		);
+			[0, bladeRadius * 0.5, 0]
+		));
 
-		bladeGroup.add(arm);
-
-		const sail = this._createMesh(
-			new THREE.BoxGeometry(
-				this.width * 0.13,
-				this.height * 0.15,
-				this.width * 0.018
-			),
+		const sail = this._box(
+			[w * 0.13, h * 0.15, w * 0.018],
 			this.materials.blade,
-			new THREE.Vector3(
-				this.width * 0.045,
-				armLength * 0.86,
-				this.width * 0.004
-			)
+			[w * 0.045, bladeRadius * 0.86, w * 0.004],
+			[0, 0, -0.12]
 		);
 
-		sail.rotation.z = -0.12;
 		bladeGroup.add(sail);
 
-		const crossBar = this._createMesh(
-			new THREE.BoxGeometry(
-				this.width * 0.16,
-				this.width * 0.025,
-				this.width * 0.022
-			),
+		bladeGroup.add(this._box(
+			[w * 0.16, w * 0.025, w * 0.022],
 			this.materials.wood,
-			new THREE.Vector3(
-				this.width * 0.04,
-				armLength * 0.70,
-				this.width * 0.012
-			)
-		);
-
-		bladeGroup.add(crossBar);
+			[w * 0.04, bladeRadius * 0.70, w * 0.012]
+		));
 
 		return bladeGroup;
 	}
