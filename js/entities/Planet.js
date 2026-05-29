@@ -67,7 +67,28 @@ export default class Planet {
 		this.orbitPathColor = color2;
 		this.orbitPath = null;
 
+		// Planet objects
+		this.props = [];
+
 		this._createDebugFeatures();
+	}
+
+	addProp(object, direction = new THREE.Vector3(0, 1, 0), sinkFactor = 0) {
+		this.addToSurface(object, direction, sinkFactor);
+
+		if (!this.props.includes(object)) {
+			this.props.push(object);
+		}
+
+		return object;
+	}
+
+	update(delta) {
+		this.move();
+
+		this.props.forEach((prop) => {
+			prop.update?.(delta);
+		});
 	}
 
 	addTo(parent) {

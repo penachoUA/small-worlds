@@ -57,7 +57,6 @@ const CAMERA_CONFIGS = {
 
 export default class Game {
 	constructor(onReady = null, debug = false) {
-		this.animatedProps = [];
 		this.onReady = onReady;
 		this.clock = new THREE.Clock();
 		this.input = new InputHandler();
@@ -88,7 +87,7 @@ export default class Game {
 
 		this.skybox.update(elapsed);
 		this.star.update(elapsed);
-		this.planets.forEach((p) => p.move());
+		this.planets.forEach((p) => p.update(delta));
 
 		if (this.cameraMode === CAMERA_MODES.THIRD_PERSON || this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
 			this.playerController.update(delta);
@@ -108,11 +107,6 @@ export default class Game {
 
 		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
-
-		// Update props animations
-		this.animatedProps?.forEach((prop) => {
-			prop.update?.(delta);
-		});
 
 		// Update shadows
 		this._updateShadowLight();
@@ -369,13 +363,13 @@ export default class Game {
 			roofColor: 0x9f2f2f
 		});
 
-		greenPlanet.addToSurface(
+		greenPlanet.addProp(
 			tallWindmill,
 			new THREE.Vector3(-0.62, 1, 0.18),
-			0.026
+			0.03
 		);
 
-		greenPlanet.addToSurface(
+		greenPlanet.addProp(
 			shortWindmill,
 			new THREE.Vector3(0.88, 0.72, -0.52),
 			0.026
@@ -386,9 +380,6 @@ export default class Game {
 
 		shortWindmill.root.scale.setScalar(0.36);
 		shortWindmill.root.rotateY(-1.85);
-
-		this.animatedProps.push(tallWindmill);
-		this.animatedProps.push(shortWindmill);
 	}
 }
 
