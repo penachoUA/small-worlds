@@ -116,13 +116,38 @@ export default class Planet {
 	}
 
 	addProp(object, direction = new THREE.Vector3(0, 1, 0), sinkFactor = 0) {
-		this.addToSurface(object, direction, sinkFactor);
+		const normal = direction.clone().normalize();
+
+		this.addToSurface(object, normal, sinkFactor);
+
+		object.planet = this;
+		object.surfaceNormal = normal;
+		object.sinkFactor = sinkFactor;
 
 		if (!this.props.includes(object)) {
 			this.props.push(object);
 		}
 
 		return object;
+	}
+
+	getBlockingProp(surfaceNormal, extraRadius = 0) {
+		const normal = surfaceNormal.clone().normalize();
+
+		return this.props.find((prop) => {
+			if (!prop.obstacle || !prop.surfaceNormal) return false;
+
+			const obstacleNormal = prop.surfaceNormal.clone().normalize();
+
+			const angle = normal.angleTo(obstacleNormal);
+			const surfaceDistance = angle * this.radius;
+
+			return surfaceDistance < prop.obstacle.radius + extraRadius;
+		});
+	}
+
+	isSurfaceBlocked(surfaceNormal, extraRadius = 0) {
+		return !!this.getBlockingProp(surfaceNormal, extraRadius);
 	}
 
 	update(delta) {

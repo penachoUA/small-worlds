@@ -30,6 +30,13 @@ export default class Windmill {
 			windowColor
 		});
 
+		// Obstacle properties
+		this.obstacle = {
+			radius: width * 0.15,
+			cameraRadius: width * 0.7,
+			height
+		};
+
 		this._computeLayout();
 		this._createModel();
 	}

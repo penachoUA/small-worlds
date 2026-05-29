@@ -5,6 +5,8 @@ const _vector = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 1, 0);
 const _right = new THREE.Vector3(1, 0, 0);
+const _nextQuat = new THREE.Quaternion();
+const _nextSurfaceNormal = new THREE.Vector3();
 
 const CONFIG = {
 	RADIUS_RATIO: 0.25,
@@ -77,6 +79,12 @@ export default class Player {
 		this.playerModel.add(this._axes);
 	}
 
+	getSurfaceNormal() {
+		return new THREE.Vector3(0, 1, 0)
+			.applyQuaternion(this.root.quaternion)
+			.normalize();
+	}
+
 	addTo(parent) {
 		parent.add(this.root);
 		return this;
@@ -119,12 +127,34 @@ export default class Player {
 
 	_move(direction) {
 		const speed = this.fsm.current?.name === PLAYER_STATES.RUNNING
-			? this.speed * 2 : this.speed;
+			? this.speed * 2
+			: this.speed;
+
 		const moveStep = speed * direction;
+
 		_vector.copy(_right).applyAxisAngle(_up, this.heading);
 		_vector.applyQuaternion(this.root.quaternion);
+
 		_quat.setFromAxisAngle(_vector, -moveStep);
-		this.root.quaternion.premultiply(_quat);
+
+		_nextQuat.copy(this.root.quaternion);
+		_nextQuat.premultiply(_quat);
+
+		_nextSurfaceNormal
+			.copy(_up)
+			.applyQuaternion(_nextQuat)
+			.normalize();
+
+		if (
+			this.currentPlanet?.isSurfaceBlocked(
+				_nextSurfaceNormal,
+				this.radius
+			)
+		) {
+			return;
+		}
+
+		this.root.quaternion.copy(_nextQuat);
 	}
 
 	_setupFSM() {
