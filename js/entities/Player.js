@@ -8,6 +8,13 @@ const _right = new THREE.Vector3(1, 0, 0);
 const _nextQuat = new THREE.Quaternion();
 const _nextSurfaceNormal = new THREE.Vector3();
 
+// For blocking behavior
+const _currentSurfaceNormal = new THREE.Vector3();
+const _desiredTangent = new THREE.Vector3();
+const _obstacleTangent = new THREE.Vector3();
+const _slideTangent = new THREE.Vector3();
+const _surfaceRotation = new THREE.Quaternion();
+
 const CONFIG = {
 	RADIUS_RATIO: 0.25,
 	DEFAULT_HEIGHT: 0.1,
@@ -79,9 +86,10 @@ export default class Player {
 		this.playerModel.add(this._axes);
 	}
 
-	getSurfaceNormal() {
-		return new THREE.Vector3(0, 1, 0)
-			.applyQuaternion(this.root.quaternion)
+	getSurfaceNormal(target = new THREE.Vector3(), quaternion = this.root.quaternion) {
+		return target
+			.copy(_up)
+			.applyQuaternion(quaternion)
 			.normalize();
 	}
 
@@ -132,6 +140,7 @@ export default class Player {
 
 		const moveStep = speed * direction;
 
+		// Movement rotation axis
 		_vector.copy(_right).applyAxisAngle(_up, this.heading);
 		_vector.applyQuaternion(this.root.quaternion);
 
@@ -140,9 +149,69 @@ export default class Player {
 		_nextQuat.copy(this.root.quaternion);
 		_nextQuat.premultiply(_quat);
 
+		this.getSurfaceNormal(_currentSurfaceNormal);
+
+		this.getSurfaceNormal(
+			_nextSurfaceNormal,
+			_nextQuat
+		);
+
+		const blockingProp = this.currentPlanet?.getBlockingProp(
+			_nextSurfaceNormal,
+			this.radius
+		);
+
+		if (!blockingProp) {
+			this.root.quaternion.copy(_nextQuat);
+			return;
+		}
+
+		// The direct movement is blocked. Now compute a slide direction along the surface.
+		_desiredTangent
+			.copy(_nextSurfaceNormal)
+			.sub(_currentSurfaceNormal)
+			.projectOnPlane(_currentSurfaceNormal);
+
+		if (_desiredTangent.lengthSq() < 0.000001) {
+			return;
+		}
+
+		_desiredTangent.normalize();
+
+		_obstacleTangent
+			.copy(blockingProp.surfaceNormal)
+			.addScaledVector(
+				_currentSurfaceNormal,
+				-blockingProp.surfaceNormal.dot(_currentSurfaceNormal)
+			);
+
+		if (_obstacleTangent.lengthSq() < 0.000001) {
+			return;
+		}
+
+		_obstacleTangent.normalize();
+
+		const towardObstacle = _desiredTangent.dot(_obstacleTangent);
+
+		if (towardObstacle <= 0) {
+			this.root.quaternion.copy(_nextQuat);
+			return;
+		}
+
+		// Remove the component of movement that points toward the obstacle.
+		_slideTangent
+			.copy(_desiredTangent)
+			.addScaledVector(_obstacleTangent, -towardObstacle);
+
+		if (_slideTangent.lengthSq() < 0.000001) {
+			return;
+		}
+
+		_slideTangent.normalize();
+
 		_nextSurfaceNormal
-			.copy(_up)
-			.applyQuaternion(_nextQuat)
+			.copy(_currentSurfaceNormal)
+			.addScaledVector(_slideTangent, Math.abs(moveStep) * 0.75)
 			.normalize();
 
 		if (
@@ -154,7 +223,12 @@ export default class Player {
 			return;
 		}
 
-		this.root.quaternion.copy(_nextQuat);
+		_surfaceRotation.setFromUnitVectors(
+			_currentSurfaceNormal,
+			_nextSurfaceNormal
+		);
+
+		this.root.quaternion.premultiply(_surfaceRotation);
 	}
 
 	_setupFSM() {
@@ -206,7 +280,6 @@ export default class Player {
 		this.jumpAction.timeScale = 1.3;
 		this.jumpDuration = jumpClip.duration / this.jumpAction.timeScale;
 
-		this.fsm.set(PLAYER_STATES.IDLE);
 		this.idleAction.play();
 		this.currentAction = this.idleAction;
 

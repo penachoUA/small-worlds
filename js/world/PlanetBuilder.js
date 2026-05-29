@@ -14,12 +14,10 @@ export default class PlanetBuilder {
 		const greenPlanet = this.planets.green;
 
 		const tallWindmill = new Windmill({
-			height: 1.7,
-			width: 1.0,
+			height: 0.82,
+			width: 0.48,
 			spinSpeed: 1.0
 		});
-
-		tallWindmill.root.scale.setScalar(0.48);
 
 		greenPlanet.addProp(
 			tallWindmill,
@@ -30,14 +28,12 @@ export default class PlanetBuilder {
 		tallWindmill.root.rotateY(0.65);
 
 		const shortWindmill = new Windmill({
-			height: 1.25,
-			width: 1.25,
+			height: 0.50,
+			width: 0.55,
 			spinSpeed: 0.65,
 			bodyColor: 0xcdbb91,
 			roofColor: 0x9f2f2f
 		});
-
-		shortWindmill.root.scale.setScalar(0.36);
 
 		greenPlanet.addProp(
 			shortWindmill,

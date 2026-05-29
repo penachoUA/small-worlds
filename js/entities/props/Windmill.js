@@ -32,7 +32,7 @@ export default class Windmill {
 
 		// Obstacle properties
 		this.obstacle = {
-			radius: width * 0.15,
+			radius: width * 0.25,
 			cameraRadius: width * 0.7,
 			height
 		};
