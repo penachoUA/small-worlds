@@ -9,6 +9,8 @@ const CONFIG = {
 	DEBUG_OPACITY: 0.5
 };
 
+let nextPlanetId = 0;
+
 // Shading
 const SHADE_COLORS = new Uint8Array([0, 255]);
 const GRADIENT_MAP = new THREE.DataTexture(
@@ -25,6 +27,7 @@ GRADIENT_MAP.needsUpdate = true;
 
 export default class Planet {
 	constructor({
+		name = null,
 		radius,
 		color1,
 		color2,
@@ -36,6 +39,9 @@ export default class Planet {
 		rotationSpeed,
 		rotationAxis
 	}) {
+		this.id = nextPlanetId++;
+		this.name = name ?? `planet-${this.id}`;
+
 		// Root handles orbital inclination — tilting the entire orbit plane
 		this.root = new THREE.Object3D();
 		this.root.rotation.z = orbitInclination * (Math.PI / 180);
@@ -51,9 +57,18 @@ export default class Planet {
 		this.orbitPivot.add(this.axisTilt);
 
 		// Setup visual, mesh is the surface of the planet
-		const geometry = new THREE.SphereGeometry(radius, CONFIG.SPHERE_SEGMENTS, CONFIG.SPHERE_SEGMENTS);
+		const geometry = new THREE.SphereGeometry(
+			radius,
+			CONFIG.SPHERE_SEGMENTS,
+			CONFIG.SPHERE_SEGMENTS
+		);
+
 		const texture = Planet._generateTexture(color1, color2, color3, orbitRadius);
-		const material = new THREE.MeshToonMaterial({ map: texture, gradientMap: GRADIENT_MAP });
+		const material = new THREE.MeshToonMaterial({
+			map: texture,
+			gradientMap: GRADIENT_MAP
+		});
+
 		this.mesh = new THREE.Mesh(geometry, material);
 		this.mesh.receiveShadow = true;
 		this.axisTilt.add(this.mesh);
@@ -67,28 +82,9 @@ export default class Planet {
 		this.orbitPathColor = color2;
 		this.orbitPath = null;
 
-		// Planet objects
 		this.props = [];
 
 		this._createDebugFeatures();
-	}
-
-	addProp(object, direction = new THREE.Vector3(0, 1, 0), sinkFactor = 0) {
-		this.addToSurface(object, direction, sinkFactor);
-
-		if (!this.props.includes(object)) {
-			this.props.push(object);
-		}
-
-		return object;
-	}
-
-	update(delta) {
-		this.move();
-
-		this.props.forEach((prop) => {
-			prop.update?.(delta);
-		});
 	}
 
 	addTo(parent) {
@@ -98,6 +94,7 @@ export default class Planet {
 
 	addPivotToPlanet(object) {
 		object.addTo(this.mesh);
+		return object;
 	}
 
 	addToSurface(object, direction = new THREE.Vector3(0, 1, 0), sinkFactor = 0) {
@@ -118,6 +115,24 @@ export default class Planet {
 		return object;
 	}
 
+	addProp(object, direction = new THREE.Vector3(0, 1, 0), sinkFactor = 0) {
+		this.addToSurface(object, direction, sinkFactor);
+
+		if (!this.props.includes(object)) {
+			this.props.push(object);
+		}
+
+		return object;
+	}
+
+	update(delta) {
+		this.move();
+
+		this.props.forEach((prop) => {
+			prop.update?.(delta);
+		});
+	}
+
 	move() {
 		this._orbit();
 		this._rotate();
@@ -127,6 +142,7 @@ export default class Planet {
 		if (this._spinAxes) this._spinAxes.visible = true;
 		if (this._surfaceGrid) this._surfaceGrid.visible = true;
 		if (this.orbitPath) this.orbitPath.visible = true;
+
 		this.mesh.material.visible = false;
 	}
 
@@ -134,6 +150,7 @@ export default class Planet {
 		if (this._spinAxes) this._spinAxes.visible = false;
 		if (this._surfaceGrid) this._surfaceGrid.visible = false;
 		if (this.orbitPath) this.orbitPath.visible = false;
+
 		this.mesh.material.visible = true;
 	}
 
@@ -161,7 +178,7 @@ export default class Planet {
 		const edges = new THREE.EdgesGeometry(gridGeometry);
 
 		const count = edges.attributes.position.count;
-		const colors = new Float32Array(count * 3); // (R,G,B) per vertex
+		const colors = new Float32Array(count * 3);
 		const positions = edges.attributes.position.array;
 
 		const tempColor = new THREE.Color();
@@ -184,6 +201,7 @@ export default class Planet {
 		});
 
 		const line = new THREE.LineSegments(edges, lineMaterial);
+
 		this.mesh.add(line);
 		this._surfaceGrid = line;
 	}
@@ -194,17 +212,20 @@ export default class Planet {
 
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
-			points.push(new THREE.Vector3(
-				Math.sin(angle) * this._orbitRadius,
-				0,
-				Math.cos(angle) * this._orbitRadius
-			));
+
+			points.push(
+				new THREE.Vector3(
+					Math.sin(angle) * this._orbitRadius,
+					0,
+					Math.cos(angle) * this._orbitRadius
+				)
+			);
 		}
 
 		const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
 		const material = new THREE.LineBasicMaterial({
 			color: this.orbitPathColor,
-			// transparent: true,
 			opacity: CONFIG.DEBUG_OPACITY,
 		});
 
@@ -213,10 +234,12 @@ export default class Planet {
 
 	static _generateTexture(color1, color2, color3, seed) {
 		const noise3D = createNoise3D(alea(seed));
+
 		const size = 512;
 		const canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;
+
 		const ctx = canvas.getContext('2d');
 
 		const low = new THREE.Color(color1);
@@ -232,24 +255,34 @@ export default class Planet {
 				const ny = Math.sin(phi) * Math.sin(theta);
 				const nz = Math.cos(phi);
 
-				const rawT = Math.max(0, Math.min(1,
-					(noise3D(nx * 3, ny * 3, nz * 3) * 0.6 +
-						noise3D(nx * 8, ny * 8, nz * 8) * 0.3 +
-						noise3D(nx * 16, ny * 16, nz * 16) * 0.1
-						+ 1) / 2
-				));
+				const rawT = Math.max(
+					0,
+					Math.min(
+						1,
+						(
+							noise3D(nx * 3, ny * 3, nz * 3) * 0.6 +
+							noise3D(nx * 8, ny * 8, nz * 8) * 0.3 +
+							noise3D(nx * 16, ny * 16, nz * 16) * 0.1 +
+							1
+						) / 2
+					)
+				);
 
-				// Posterize to 8 levels
 				const t = Math.floor(rawT * 8) / 8;
 
-				let r, g, b;
+				let r;
+				let g;
+				let b;
+
 				if (t < 0.4) {
 					const s = t / 0.4;
+
 					r = low.r + (mid.r - low.r) * s;
 					g = low.g + (mid.g - low.g) * s;
 					b = low.b + (mid.b - low.b) * s;
 				} else {
 					const s = (t - 0.4) / 0.6;
+
 					r = mid.r + (high.r - mid.r) * s;
 					g = mid.g + (high.g - mid.g) * s;
 					b = mid.b + (high.b - mid.b) * s;
@@ -263,4 +296,3 @@ export default class Planet {
 		return new THREE.CanvasTexture(canvas);
 	}
 }
-

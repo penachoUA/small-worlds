@@ -56,7 +56,7 @@ export default class Player {
 
 		this.height = height;
 		this.speed = speed;
-		this.turnSpeed = 4 * speed;
+		this.turnSpeed = 2 * speed;
 		this.radius = height * CONFIG.RADIUS_RATIO;
 		this.heading = 0;
 
@@ -111,7 +111,9 @@ export default class Player {
 	deactivateDebugMode() { this._axes.visible = false; }
 
 	_turn(direction) {
-		this.heading += this.turnSpeed * direction;
+		const turnSpeed = this.fsm.current?.name === PLAYER_STATES.RUNNING
+			? this.turnSpeed * 2 : this.turnSpeed;
+		this.heading += turnSpeed * direction;
 		this.playerModel.quaternion.setFromAxisAngle(_up, this.heading);
 	}
 

@@ -1,18 +1,16 @@
-import * as THREE from 'three'
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { renderer, scene, initComposer, getComposer } from './scene.js';
 import Planet from '../entities/Planet.js';
 import Star from '../entities/Star.js';
 import Player from '../entities/Player.js';
-import PlayerController from '../controllers/PlayerController.js'
+import PlayerController from '../controllers/PlayerController.js';
 import CameraController from '../controllers/CameraController.js';
 import CameraRig from '../camera/CameraRig.js';
 import InputHandler from './InputHandler.js';
+import PlanetBuilder from '../world/PlanetBuilder.js';
 import Skybox from './Skybox.js';
-
-import Tree from '../entities/props/Tree.js';
-import Windmill from '../entities/props/Windmill.js';
 
 const STAR_INTENSITY = 140;
 
@@ -61,6 +59,9 @@ export default class Game {
 		this.clock = new THREE.Clock();
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
+
+		this.planets = {};
+
 		initComposer(this.cameraRig.camera);
 
 		this._loadAssets().then(() => {
@@ -77,6 +78,7 @@ export default class Game {
 			this._toggleDebugMode();
 
 			renderer.setAnimationLoop(() => this.update());
+
 			if (this.onReady) this.onReady();
 		});
 	}
@@ -87,34 +89,30 @@ export default class Game {
 
 		this.skybox.update(elapsed);
 		this.star.update(elapsed);
-		this.planets.forEach((p) => p.update(delta));
 
-		if (this.cameraMode === CAMERA_MODES.THIRD_PERSON || this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
+		this._getPlanetList().forEach((planet) => {
+			planet.update(delta);
+		});
+
+		if (
+			this.cameraMode === CAMERA_MODES.THIRD_PERSON ||
+			this.cameraMode === CAMERA_MODES.FIRST_PERSON
+		) {
 			this.playerController.update(delta);
 		}
 
-		// Handle camera mode changes
 		if (this.input.isTapped(CONTROLS.CYCLE_CAMERA)) {
 			this.cycleCameraMode();
 		}
 
-		// Handle planet change
-		for (let i = 0; i < this.planets.length; i++) {
-			if (this.input.isTapped(`${CONTROLS.PLANET_PREFIX}${i + 1}`)) {
-				this.changePlanet(i);
-			}
-		}
+		this._handlePlanetTravelInput();
 
-		// Handle camera
 		this.activeCameraController.update(this.player.isMoving);
 
-		// Update shadows
 		this._updateShadowLight();
 
-		// Render scene
 		getComposer().render();
 
-		// Handle debug mode toggling
 		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
 			this._toggleDebugMode();
 		}
@@ -135,7 +133,11 @@ export default class Game {
 			case CAMERA_MODES.THIRD_PERSON:
 				this.player.attachToModel(this.cameraRig);
 				this.cameraRig.setPosition(0, this.player.height * 0.01, 0);
-				this.cameraRig.setCameraPosition(0, this.player.height * 0.6, this.player.height * 1.3);
+				this.cameraRig.setCameraPosition(
+					0,
+					this.player.height * 0.6,
+					this.player.height * 1.3
+				);
 				break;
 
 			case CAMERA_MODES.FIRST_PERSON:
@@ -165,86 +167,136 @@ export default class Game {
 	cycleCameraMode() {
 		const modesArray = Object.values(CAMERA_MODES);
 		const i = modesArray.indexOf(this.cameraMode);
+
 		this.setCameraMode(modesArray[(i + 1) % modesArray.length]);
 	}
 
-	changePlanet(planetIndex) {
+	changePlanet(planetId) {
 		if (this.cameraMode === CAMERA_MODES.SYSTEM) return;
 
-		this.currentPlanet = this.planets[planetIndex];
+		const targetPlanet = this._getPlanetById(planetId);
+
+		if (!targetPlanet) {
+			console.warn(`No planet found with id ${planetId}`);
+			return;
+		}
+
+		this.currentPlanet = targetPlanet;
 		this.player.moveToPlanet(this.currentPlanet);
 		this._configureShadowCamera();
-		this.setCameraMode(this.cameraMode); // Refresh the rig parenting
+		this.setCameraMode(this.cameraMode);
+	}
+
+	_handlePlanetTravelInput() {
+		const planetCount = this._getPlanetList().length;
+
+		for (let i = 0; i < planetCount; i++) {
+			if (this.input.isTapped(`${CONTROLS.PLANET_PREFIX}${i + 1}`)) {
+				this.changePlanet(i);
+			}
+		}
+	}
+
+	_addPlanet(planet) {
+		this.planets[planet.name] = planet;
+		return planet;
+	}
+
+	_getPlanetList() {
+		return Object.values(this.planets).sort((a, b) => a.id - b.id);
+	}
+
+	_getPlanetById(id) {
+		return this._getPlanetList().find((planet) => planet.id === id);
 	}
 
 	_initLighting() {
 		this.shadowLight = new THREE.DirectionalLight(0xffffff, 1.0);
 		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
+
 		scene.add(this.ambientLight);
 	}
 
 	_initSystem() {
-		// Star
 		this.star = new Star({
 			radius: 8,
 			light_intensity: STAR_INTENSITY,
 		});
 
 		this.star.addTo(scene);
-		// Planets
-		this.planets = [
+
+		this._addPlanet(
 			new Planet({
+				name: 'lava',
 				radius: 0.5,
-				color1: 0x1a0a00,  // dark basalt
-				color2: 0x8b1a00,  // deep red rock
-				color3: 0xff4500,  // bright lava
+				color1: 0x1a0a00,
+				color2: 0x8b1a00,
+				color3: 0xff4500,
 				orbitRadius: 13,
 				orbitSpeed: 0.0042,
 				orbitAngle: 2,
 				orbitInclination: -10,
 				rotationSpeed: 0.0044,
 				rotationAxis: 23
-			}),
+			})
+		);
+
+		this._addPlanet(
 			new Planet({
+				name: 'ice',
 				radius: 1.5,
-				color1: 0x1a3a6e,  // deep blue cracks
-				color2: 0x60c8e8,  // bright ice blue
-				color3: 0xf0f8ff,  // white snow
+				color1: 0x1a3a6e,
+				color2: 0x60c8e8,
+				color3: 0xf0f8ff,
 				orbitRadius: 25,
 				orbitSpeed: 0.0026,
 				orbitAngle: 4,
 				orbitInclination: 20,
 				rotationSpeed: 0.0024,
 				rotationAxis: 7
-			}),
+			})
+		);
+
+		this._addPlanet(
 			new Planet({
+				name: 'green',
 				radius: 2,
-				color1: 0x1a6b2e,  // deep jungle
-				color2: 0x4caf50,  // mid green land
-				color3: 0xc8d97a,  // dry/sandy highlands
+				color1: 0x1a6b2e,
+				color2: 0x4caf50,
+				color3: 0xc8d97a,
 				orbitRadius: 50,
 				orbitSpeed: 0.0024,
 				orbitAngle: 0,
 				orbitInclination: 15,
 				rotationSpeed: 0.002,
 				rotationAxis: 12
-			}),
-		];
+			})
+		);
 
 		this._initPlanetObjects();
 
-		this.planets.forEach((p) => p.addTo(scene))
-		this.currentPlanet = this.planets[0];
+		this._getPlanetList().forEach((planet) => {
+			planet.addTo(scene);
+		});
+
+		this.currentPlanet = this._getPlanetById(0);
 	}
 
-
 	_initPlayer() {
-		this.player = new Player({ height: 0.5, speed: 0.005, gltf: this.playerGLTF });
+		this.player = new Player({
+			height: 0.5,
+			speed: 0.005,
+			gltf: this.playerGLTF
+		});
+
 		this.player.moveToPlanet(this.currentPlanet);
 	}
 
 	_initControllers() {
-		this.playerController = new PlayerController({ player: this.player, input: this.input });
+		this.playerController = new PlayerController({
+			player: this.player,
+			input: this.input
+		});
 
 		this.cameraControllers = {
 			thirdPerson: new CameraController({
@@ -267,7 +319,6 @@ export default class Game {
 				input: this.input,
 				config: CAMERA_CONFIGS[CAMERA_MODES.SYSTEM]
 			})
-
 		};
 
 		this.activeCameraController = this.cameraControllers.thirdPerson;
@@ -284,7 +335,7 @@ export default class Game {
 
 			this.cameraRig.camera.aspect = aspect;
 			this.cameraRig.camera.updateProjectionMatrix();
-		})
+		});
 	}
 
 	_initShadows() {
@@ -292,17 +343,21 @@ export default class Game {
 		this.shadowLight.castShadow = true;
 		this.shadowLight.shadow.mapSize.set(8192, 8192);
 		this.shadowLight.shadow.normalBias = 0.02;
+
 		scene.add(this.shadowLight);
 		scene.add(this.shadowLight.target);
+
 		this._configureShadowCamera();
 	}
 
 	_configureShadowCamera() {
 		if (!this.currentPlanet) return;
+
 		const r = this.currentPlanet.radius;
 		const cam = this.shadowLight.shadow.camera;
 
 		const s = r * 2;
+
 		cam.left = -s;
 		cam.right = s;
 		cam.top = s;
@@ -314,8 +369,11 @@ export default class Game {
 
 	_updateShadowLight() {
 		if (!this.currentPlanet) return;
+
 		const planetPos = new THREE.Vector3();
+
 		this.currentPlanet.mesh.getWorldPosition(planetPos);
+
 		const sunDir = planetPos.clone().normalize();
 		const r = this.currentPlanet.radius;
 
@@ -323,19 +381,26 @@ export default class Game {
 		this.shadowLight.target.position.copy(planetPos);
 		this.shadowLight.target.updateMatrixWorld();
 
-		// Match point light intensity at this distance
 		const dist = planetPos.length();
 		const pointLightIntensity = STAR_INTENSITY / (1.5 * dist * dist);
+
 		this.shadowLight.intensity = pointLightIntensity;
 	}
 
 	_toggleDebugMode() {
 		this.debugActive = !this.debugActive;
+
 		if (this.debugActive) {
-			this.planets.forEach((p) => { p.activateDebugMode() });
+			this._getPlanetList().forEach((planet) => {
+				planet.activateDebugMode();
+			});
+
 			this.player.activateDebugMode();
 		} else {
-			this.planets.forEach(p => p.deactivateDebugMode());
+			this._getPlanetList().forEach((planet) => {
+				planet.deactivateDebugMode();
+			});
+
 			this.player.deactivateDebugMode();
 		}
 	}
@@ -347,39 +412,7 @@ export default class Game {
 	}
 
 	_initPlanetObjects() {
-		const greenPlanet = this.planets[2];
-
-		const tallWindmill = new Windmill({
-			height: 1.7,
-			width: 1.0,
-			spinSpeed: 1.0
-		});
-
-		const shortWindmill = new Windmill({
-			height: 1.25,
-			width: 1.25,
-			spinSpeed: 0.65,
-			bodyColor: 0xcdbb91,
-			roofColor: 0x9f2f2f
-		});
-
-		greenPlanet.addProp(
-			tallWindmill,
-			new THREE.Vector3(-0.62, 1, 0.18),
-			0.03
-		);
-
-		greenPlanet.addProp(
-			shortWindmill,
-			new THREE.Vector3(0.88, 0.72, -0.52),
-			0.026
-		);
-
-		tallWindmill.root.scale.setScalar(0.48);
-		tallWindmill.root.rotateY(0.65);
-
-		shortWindmill.root.scale.setScalar(0.36);
-		shortWindmill.root.rotateY(-1.85);
+		const builder = new PlanetBuilder(this.planets);
+		builder.populate();
 	}
 }
-
