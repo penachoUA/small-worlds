@@ -7,6 +7,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _right = new THREE.Vector3(1, 0, 0);
 const _nextQuat = new THREE.Quaternion();
 const _nextSurfaceNormal = new THREE.Vector3();
+const _terrainSurfaceNormal = new THREE.Vector3();
 
 // For blocking behavior
 const _currentSurfaceNormal = new THREE.Vector3();
@@ -72,6 +73,7 @@ export default class Player {
 		// Jump state
 		this.jumpTime = 0;
 		this.jumpHeight = this.height * CONFIG.JUMP_HEIGHT_RATIO;
+		this.groundOffset = 0;
 
 		// Animation
 		this.mixer = null;
@@ -106,12 +108,13 @@ export default class Player {
 		this.currentPlanet = planet;
 		this.root.position.set(0, 0, 0);
 		this.root.quaternion.identity();
-		this.playerModel.position.set(0, planet.radius, 0);
 		planet.addPivotToPlanet(this);
+		this.setGroundOffset(0);
 	}
 
 	update(delta, input) {
 		this.fsm.update(delta, input);
+		this._updateGroundHeight(this.groundOffset);
 		if (this.mixer) this.mixer.update(delta);
 	}
 
@@ -120,7 +123,21 @@ export default class Player {
 	}
 
 	setGroundOffset(offset) {
-		this.playerModel.position.y = this.currentPlanet.radius + offset;
+		this.groundOffset = offset;
+		this._updateGroundHeight(offset);
+	}
+
+	_updateGroundHeight(offset = 0) {
+		if (!this.currentPlanet) return;
+
+		const terrainOffset = this.currentPlanet.getTerrainOffset
+			? this.currentPlanet.getTerrainOffset(
+				this.getSurfaceNormal(_terrainSurfaceNormal)
+			)
+			: 0;
+
+		this.playerModel.position.y =
+			this.currentPlanet.radius + terrainOffset + offset;
 	}
 
 	activateDebugMode() { this._axes.visible = true; }

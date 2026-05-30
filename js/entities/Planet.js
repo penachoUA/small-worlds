@@ -54,6 +54,8 @@ export default class Planet {
 		this.radius = radius;
 		this.terrainAmplitude = terrainAmplitude;
 		this.terrainSeed = terrainSeed ?? orbitRadius;
+		this.terrainNoise3D = createNoise3D(alea(this.terrainSeed));
+		this._terrainNormal = new THREE.Vector3();
 
 		// Root handles orbital inclination — tilting the entire orbit plane
 		this.root = new THREE.Object3D();
@@ -74,7 +76,7 @@ export default class Planet {
 			radius,
 			segments: CONFIG.SPHERE_SEGMENTS,
 			amplitude: radius * terrainAmplitude,
-			seed: this.terrainSeed
+			noise3D: this.terrainNoise3D
 		});
 
 		const texture = Planet._generateTexture(color1, color2, color3, this.terrainSeed);
@@ -161,6 +163,25 @@ export default class Planet {
 
 	isSurfaceBlocked(surfaceNormal, extraRadius = 0) {
 		return !!this.getBlockingProp(surfaceNormal, extraRadius);
+	}
+
+	getTerrainOffset(surfaceNormal) {
+		if (!this.terrainAmplitude || this.terrainAmplitude <= 0) {
+			return 0;
+		}
+
+		this._terrainNormal
+			.copy(surfaceNormal)
+			.normalize();
+
+		const terrainValue = Planet._sampleTerrainValue(
+			this.terrainNoise3D,
+			this._terrainNormal.x,
+			this._terrainNormal.y,
+			this._terrainNormal.z
+		);
+
+		return this.radius * this.terrainAmplitude * terrainValue;
 	}
 
 	update(delta) {
@@ -274,7 +295,7 @@ export default class Planet {
 		radius,
 		segments,
 		amplitude,
-		seed
+		noise3D
 	}) {
 		const geometry = new THREE.SphereGeometry(
 			radius,
@@ -286,7 +307,6 @@ export default class Planet {
 			return geometry;
 		}
 
-		const noise3D = createNoise3D(alea(seed));
 		const position = geometry.attributes.position;
 		const normal = new THREE.Vector3();
 		const vertex = new THREE.Vector3();
@@ -295,24 +315,14 @@ export default class Planet {
 			vertex.fromBufferAttribute(position, i);
 			normal.copy(vertex).normalize();
 
-			const rawT = Planet._samplePlanetNoise(
+			const terrainValue = Planet._sampleTerrainValue(
 				noise3D,
 				normal.x,
 				normal.y,
 				normal.z
 			);
 
-			const colorHeight = (rawT - 0.5) * 2;
-
-			const detail =
-				noise3D(normal.x * 22, normal.y * 22, normal.z * 22) * 0.18 +
-				noise3D(normal.x * 38, normal.y * 38, normal.z * 38) * 0.08;
-
-			const displacement = amplitude * THREE.MathUtils.clamp(
-				colorHeight * 0.85 + detail,
-				-1,
-				1
-			);
+			const displacement = amplitude * terrainValue;
 
 			vertex
 				.copy(normal)
@@ -405,6 +415,21 @@ export default class Planet {
 					1
 				) / 2
 			)
+		);
+	}
+
+	static _sampleTerrainValue(noise3D, nx, ny, nz) {
+		const rawT = Planet._samplePlanetNoise(noise3D, nx, ny, nz);
+		const colorHeight = (rawT - 0.5) * 2;
+
+		const detail =
+			noise3D(nx * 22, ny * 22, nz * 22) * 0.18 +
+			noise3D(nx * 38, ny * 38, nz * 38) * 0.08;
+
+		return THREE.MathUtils.clamp(
+			colorHeight * 0.85 + detail,
+			-1,
+			1
 		);
 	}
 }
