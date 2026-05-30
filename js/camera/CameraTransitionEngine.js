@@ -14,6 +14,7 @@ export default class CameraTransitionEngine {
 	start({
 		duration,
 		targetRigPosition = null,
+		targetRigQuaternion = null,
 		targetCameraPosition = null,
 		targetFov = null
 	}) {
@@ -27,6 +28,11 @@ export default class CameraTransitionEngine {
 			targetRigPosition: targetRigPosition
 				? targetRigPosition.clone()
 				: this.cameraRig.root.position.clone(),
+
+			startRigQuaternion: this.cameraRig.root.quaternion.clone(),
+			targetRigQuaternion: targetRigQuaternion
+				? targetRigQuaternion.clone()
+				: this.cameraRig.root.quaternion.clone(),
 
 			startCameraPosition: this.cameraRig.camera.position.clone(),
 			targetCameraPosition: targetCameraPosition
@@ -65,6 +71,12 @@ export default class CameraTransitionEngine {
 			t
 		);
 
+		this.cameraRig.root.quaternion.slerpQuaternions(
+			transition.startRigQuaternion,
+			transition.targetRigQuaternion,
+			t
+		);
+
 		this.cameraRig.camera.fov = THREE.MathUtils.lerp(
 			transition.startFov,
 			transition.targetFov,
@@ -84,6 +96,7 @@ export default class CameraTransitionEngine {
 		const transition = this.transition;
 
 		this.cameraRig.root.position.copy(transition.targetRigPosition);
+		this.cameraRig.root.quaternion.copy(transition.targetRigQuaternion);
 		this.cameraRig.camera.position.copy(transition.targetCameraPosition);
 		this.cameraRig.camera.fov = transition.targetFov;
 		this.cameraRig.camera.updateProjectionMatrix();

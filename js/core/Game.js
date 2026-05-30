@@ -75,6 +75,7 @@ export default class Game {
 		this.cameraTransitionEngine = new CameraTransitionEngine({
 			cameraRig: this.cameraRig
 		});
+		this.pendingCameraControllerReset = false;
 
 		this.planets = {};
 		this.planetTravel = null;
@@ -159,6 +160,11 @@ export default class Game {
 	}
 
 	_handleCameraTransitionFinished() {
+		if (this.pendingCameraControllerReset) {
+			this.pendingCameraControllerReset = false;
+			this._resetActiveCameraController();
+		}
+
 		if (!this.planetTravel) return;
 
 		if (this.planetTravel.phase === 'pullOut') {
@@ -178,6 +184,11 @@ export default class Game {
 
 		if (this._canUseLocalCameraModeTransition(this.cameraMode, mode)) {
 			this._startLocalCameraModeTransition(mode);
+			return;
+		}
+
+		if (this._canUseParentChangingCameraModeTransition(this.cameraMode, mode)) {
+			this._startParentChangingCameraModeTransition(mode);
 			return;
 		}
 
@@ -229,24 +240,51 @@ export default class Game {
 		this.activeCameraController = this.cameraControllers[mode] ?? null;
 	}
 
+	_startParentChangingCameraModeTransition(targetMode) {
+		const parent = this._getCameraModeParent(targetMode);
+
+		this.cameraMode = targetMode;
+		this._setActiveCameraController(targetMode);
+
+		/*
+			Reparent while preserving current world transform.
+			This avoids the immediate visual snap caused by parent changes.
+		*/
+		this.cameraRig.attachTo(parent, true);
+
+		const targetRigPosition = this._getCameraModeRigPosition(targetMode);
+		const targetCameraPosition = this._getCameraModeCameraPosition(targetMode);
+
+		this.pendingCameraControllerReset = true;
+
+		this.cameraTransitionEngine.start({
+			duration: CAMERA_MODE_TRANSITION.DURATION * 1.4,
+			targetRigPosition,
+			targetRigQuaternion: new THREE.Quaternion(),
+			targetCameraPosition,
+			targetFov: this.cameraRig.camera.fov
+		});
+	}
+
+	_canUseParentChangingCameraModeTransition(fromMode, toMode) {
+		const supportedModes = [
+			CAMERA_MODES.THIRD_PERSON,
+			CAMERA_MODES.FIRST_PERSON,
+			CAMERA_MODES.SYSTEM
+		];
+
+		return supportedModes.includes(fromMode) && supportedModes.includes(toMode);
+	}
+
 	_applyCameraModeRig(mode) {
-		switch (mode) {
-			case CAMERA_MODES.THIRD_PERSON:
-			case CAMERA_MODES.FIRST_PERSON:
-				this.player.attachToModel(this.cameraRig);
-				break;
+		const parent = this._getCameraModeParent(mode);
 
-			case CAMERA_MODES.PLANET:
-				this.currentPlanet.addPivotToPlanet(this.cameraRig);
-				break;
-
-			case CAMERA_MODES.SYSTEM:
-				this.cameraRig.addTo(scene);
-				break;
-		}
+		this.cameraRig.attachTo(parent);
 
 		const rigPosition = this._getCameraModeRigPosition(mode);
 		const cameraPosition = this._getCameraModeCameraPosition(mode);
+
+		this.cameraRig.root.quaternion.identity();
 
 		this.cameraRig.setPosition(
 			rigPosition.x,
@@ -302,6 +340,21 @@ export default class Game {
 
 			default:
 				return target.set(0, 0, 0);
+		}
+	}
+
+	_getCameraModeParent(mode) {
+		switch (mode) {
+			case CAMERA_MODES.THIRD_PERSON:
+			case CAMERA_MODES.FIRST_PERSON:
+				return this.player.playerModel;
+
+			case CAMERA_MODES.PLANET:
+				return this.currentPlanet.mesh;
+
+			case CAMERA_MODES.SYSTEM:
+			default:
+				return scene;
 		}
 	}
 

@@ -21,7 +21,16 @@ export default class CameraRig {
 	}
 
 	addTo(parent) {
-		parent.add(this.root);
+		return this.attachTo(parent);
+	}
+
+	attachTo(parent, preserveWorld = false) {
+		if (preserveWorld && this.root.parent) {
+			parent.attach(this.root);
+		} else {
+			parent.add(this.root);
+		}
+
 		return this;
 	}
 
