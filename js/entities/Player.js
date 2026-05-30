@@ -21,6 +21,8 @@ const CONFIG = {
 	DEFAULT_HEIGHT: 0.1,
 	DEFAULT_SPEED: 0.045,
 	JUMP_HEIGHT_RATIO: 0.2,
+
+	TERRAIN_HEIGHT_DEAD_ZONE: 0.018,
 };
 
 const PART_COLORS = [
@@ -70,10 +72,11 @@ export default class Player {
 		this.radius = height * CONFIG.RADIUS_RATIO;
 		this.heading = 0;
 
-		// Jump state
+		// Jump / ground visual offset
 		this.jumpTime = 0;
 		this.jumpHeight = this.height * CONFIG.JUMP_HEIGHT_RATIO;
 		this.groundOffset = 0;
+		this.lockedTerrainOffset = null;
 
 		// Animation
 		this.mixer = null;
@@ -108,13 +111,18 @@ export default class Player {
 		this.currentPlanet = planet;
 		this.root.position.set(0, 0, 0);
 		this.root.quaternion.identity();
+
+		this.groundOffset = 0;
+		this.lockedTerrainOffset = null;
+
 		planet.addPivotToPlanet(this);
-		this.setGroundOffset(0);
+		this._updateGroundHeight();
 	}
 
 	update(delta, input) {
 		this.fsm.update(delta, input);
-		this._updateGroundHeight(this.groundOffset);
+		this._updateGroundHeight();
+
 		if (this.mixer) this.mixer.update(delta);
 	}
 
@@ -124,20 +132,31 @@ export default class Player {
 
 	setGroundOffset(offset) {
 		this.groundOffset = offset;
-		this._updateGroundHeight(offset);
+		this._updateGroundHeight();
 	}
 
-	_updateGroundHeight(offset = 0) {
+	_updateGroundHeight() {
 		if (!this.currentPlanet) return;
 
-		const terrainOffset = this.currentPlanet.getTerrainOffset
+		const targetTerrainOffset = this.currentPlanet.getTerrainOffset
 			? this.currentPlanet.getTerrainOffset(
 				this.getSurfaceNormal(_terrainSurfaceNormal)
 			)
 			: 0;
 
+		if (this.lockedTerrainOffset === null) {
+			this.lockedTerrainOffset = targetTerrainOffset;
+		}
+
+		const delta = targetTerrainOffset - this.lockedTerrainOffset;
+
+		if (Math.abs(delta) > CONFIG.TERRAIN_HEIGHT_DEAD_ZONE) {
+			this.lockedTerrainOffset =
+				targetTerrainOffset - Math.sign(delta) * CONFIG.TERRAIN_HEIGHT_DEAD_ZONE;
+		}
+
 		this.playerModel.position.y =
-			this.currentPlanet.radius + terrainOffset + offset;
+			this.currentPlanet.radius + this.lockedTerrainOffset + this.groundOffset;
 	}
 
 	activateDebugMode() { this._axes.visible = true; }
@@ -146,6 +165,7 @@ export default class Player {
 	_turn(direction) {
 		const turnSpeed = this.fsm.current?.name === PLAYER_STATES.RUNNING
 			? this.turnSpeed * 2 : this.turnSpeed;
+
 		this.heading += turnSpeed * direction;
 		this.playerModel.quaternion.setFromAxisAngle(_up, this.heading);
 	}

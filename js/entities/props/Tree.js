@@ -101,11 +101,6 @@ export default class Tree {
 				width: w * 0.28,
 				centerY: h * 0.29
 			},
-			roots: {
-				y: h * 0.055,
-				length: w * 0.32,
-				thickness: w * 0.04
-			},
 			canopy: {
 				baseY: h * 0.58,
 				roundCenterY: h * 0.71,
@@ -116,7 +111,6 @@ export default class Tree {
 
 	_createModel() {
 		this._createTrunk();
-		this._createRoots();
 		this._createCanopy();
 	}
 
@@ -199,25 +193,6 @@ export default class Tree {
 			position: [0, trunk.centerY, 0],
 			rotation: [0, Math.PI / 6, 0]
 		});
-	}
-
-	_createRoots() {
-		const { y, length, thickness } = this.layout.roots;
-
-		for (let i = 0; i < 3; i++) {
-			const angle = i * (Math.PI * 2 / 3) + 0.18;
-
-			this._box({
-				size: [thickness, thickness, length],
-				material: this.materials.trunk,
-				position: [
-					Math.sin(angle) * length * 0.25,
-					y,
-					Math.cos(angle) * length * 0.25
-				],
-				rotation: [0.22, angle, 0]
-			});
-		}
 	}
 
 	_createCanopy() {

@@ -99,6 +99,12 @@ export default class Game {
 			this.cameraMode === CAMERA_MODES.FIRST_PERSON
 		) {
 			this.playerController.update(delta);
+			this.cameraRig.stabilizeVerticalTarget(
+				this.player.playerModel.position.y,
+				0.035
+			);
+		} else {
+			this.cameraRig.clearVerticalStabilizer();
 		}
 
 		if (this.input.isTapped(CONTROLS.CYCLE_CAMERA)) {
@@ -238,7 +244,7 @@ export default class Game {
 				orbitInclination: -10,
 				rotationSpeed: 0.0044,
 				rotationAxis: 23,
-				terrainAmplitude: 0.045,
+				terrainAmplitude: 0.1,
 			})
 		);
 
