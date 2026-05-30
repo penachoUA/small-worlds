@@ -53,6 +53,13 @@ const CAMERA_CONFIGS = {
 	}
 };
 
+const PLANET_TRANSITION = {
+	DURATION: 0.9,
+	PULLBACK_MULTIPLIER: 2.15,
+	FOV_PEAK: 96,
+	MIN_FAR_DISTANCE: 1.8
+};
+
 export default class Game {
 	constructor(onReady = null, debug = false) {
 		this.onReady = onReady;
@@ -61,6 +68,7 @@ export default class Game {
 		this.cameraRig = new CameraRig();
 
 		this.planets = {};
+		this.planetTransition = null;
 
 		initComposer(this.cameraRig.camera);
 
@@ -93,6 +101,20 @@ export default class Game {
 		this._getPlanetList().forEach((planet) => {
 			planet.update(delta);
 		});
+
+		if (this.planetTransition) {
+			this._updatePlanetTransition(delta);
+			this._updateShadowLight();
+
+			getComposer().render();
+
+			if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
+				this._toggleDebugMode();
+			}
+
+			this.input.afterUpdate();
+			return;
+		}
 
 		if (
 			this.cameraMode === CAMERA_MODES.THIRD_PERSON ||
@@ -129,13 +151,17 @@ export default class Game {
 	setCameraMode(mode) {
 		this.cameraMode = mode;
 
-		if (this.cameraControllers[mode]) {
-			this.activeCameraController = this.cameraControllers[mode];
-		} else {
-			this.activeCameraController = null;
-		}
+		this._setActiveCameraController(mode);
+		this._applyCameraModeRig(mode);
+		this._resetActiveCameraController();
+	}
 
-		switch (this.cameraMode) {
+	_setActiveCameraController(mode) {
+		this.activeCameraController = this.cameraControllers[mode] ?? null;
+	}
+
+	_applyCameraModeRig(mode) {
+		switch (mode) {
 			case CAMERA_MODES.THIRD_PERSON:
 				this.player.attachToModel(this.cameraRig);
 				this.cameraRig.setPosition(0, this.player.height * 0.01, 0);
@@ -164,13 +190,17 @@ export default class Game {
 				this.cameraRig.setCameraPosition(0, 0, 70);
 				break;
 		}
+	}
 
+	_resetActiveCameraController() {
 		if (this.activeCameraController) {
 			this.activeCameraController.reset();
 		}
 	}
 
 	cycleCameraMode() {
+		if (this.planetTransition) return;
+
 		const modesArray = Object.values(CAMERA_MODES);
 		const i = modesArray.indexOf(this.cameraMode);
 
@@ -178,7 +208,14 @@ export default class Game {
 	}
 
 	changePlanet(planetId) {
-		if (this.cameraMode === CAMERA_MODES.SYSTEM) return;
+		if (this.planetTransition) return;
+
+		if (
+			this.cameraMode === CAMERA_MODES.SYSTEM ||
+			this.cameraMode === CAMERA_MODES.PLANET
+		) {
+			return;
+		}
 
 		const targetPlanet = this._getPlanetById(planetId);
 
@@ -187,10 +224,148 @@ export default class Game {
 			return;
 		}
 
-		this.currentPlanet = targetPlanet;
+		if (targetPlanet === this.currentPlanet) {
+			return;
+		}
+
+		this._startPlanetTransition(targetPlanet);
+	}
+
+	_startPlanetTransition(targetPlanet) {
+		/*
+			Simple local teleport pulse.
+
+			Important:
+			setCameraMode(THIRD_PERSON) happens before capturing startCameraPosition,
+			so every transition starts from the canonical third-person camera distance,
+			not from a previously pulled-back transition distance.
+		*/
+		this.setCameraMode(CAMERA_MODES.THIRD_PERSON);
+
+		const startCameraPosition = this.cameraRig.camera.position.clone();
+		const farCameraPosition = startCameraPosition.clone();
+
+		farCameraPosition.z = Math.max(
+			startCameraPosition.z * PLANET_TRANSITION.PULLBACK_MULTIPLIER,
+			PLANET_TRANSITION.MIN_FAR_DISTANCE
+		);
+
+		farCameraPosition.y = startCameraPosition.y * 1.15;
+
+		this.planetTransition = {
+			targetPlanet,
+			elapsed: 0,
+			duration: PLANET_TRANSITION.DURATION,
+			switched: false,
+
+			startCameraPosition,
+			farCameraPosition,
+			targetCameraPosition: startCameraPosition.clone(),
+
+			startFov: this.cameraRig.camera.fov,
+			peakFov: PLANET_TRANSITION.FOV_PEAK,
+			targetFov: this.cameraRig.camera.fov
+		};
+	}
+
+	_updatePlanetTransition(delta) {
+		const transition = this.planetTransition;
+		if (!transition) return;
+
+		transition.elapsed += delta;
+
+		const rawT = THREE.MathUtils.clamp(
+			transition.elapsed / transition.duration,
+			0,
+			1
+		);
+
+		if (rawT >= 0.5 && !transition.switched) {
+			this._switchPlanetAtTransitionPeak(transition);
+		}
+
+		if (rawT < 0.5) {
+			const t = this._easeInOutCubic(rawT / 0.5);
+
+			this.cameraRig.camera.position.lerpVectors(
+				transition.startCameraPosition,
+				transition.farCameraPosition,
+				t
+			);
+
+			this.cameraRig.camera.fov = THREE.MathUtils.lerp(
+				transition.startFov,
+				transition.peakFov,
+				t
+			);
+		} else {
+			const t = this._easeInOutCubic((rawT - 0.5) / 0.5);
+
+			this.cameraRig.camera.position.lerpVectors(
+				transition.farCameraPosition,
+				transition.targetCameraPosition,
+				t
+			);
+
+			this.cameraRig.camera.fov = THREE.MathUtils.lerp(
+				transition.peakFov,
+				transition.targetFov,
+				t
+			);
+		}
+
+		this.cameraRig.camera.updateProjectionMatrix();
+
+		if (rawT >= 1) {
+			this._finishPlanetTransition();
+		}
+	}
+
+	_switchPlanetAtTransitionPeak(transition) {
+		transition.switched = true;
+
+		this.currentPlanet = transition.targetPlanet;
 		this.player.moveToPlanet(this.currentPlanet);
 		this._configureShadowCamera();
-		this.setCameraMode(this.cameraMode);
+
+		/*
+			Reset to the correct third-person setup for the new planet/player.
+			Then capture that as the real target.
+		*/
+		this.setCameraMode(CAMERA_MODES.THIRD_PERSON);
+
+		transition.targetCameraPosition.copy(this.cameraRig.camera.position);
+		transition.targetFov = transition.startFov;
+
+		/*
+			Continue the visual transition from the pulled-back position.
+			Do not let the temporary far distance become the new normal distance.
+		*/
+		this.cameraRig.camera.position.copy(transition.farCameraPosition);
+		this.cameraRig.camera.fov = transition.peakFov;
+		this.cameraRig.camera.updateProjectionMatrix();
+	}
+
+	_finishPlanetTransition() {
+		const transition = this.planetTransition;
+		if (!transition) return;
+
+		/*
+			End exactly at the captured target position.
+			Do not call setCameraMode() here, because that would reset the camera
+			after the lerp and can create a visible snap.
+		*/
+		this.cameraRig.camera.position.copy(transition.targetCameraPosition);
+		this.cameraRig.camera.fov = transition.targetFov;
+		this.cameraRig.camera.updateProjectionMatrix();
+
+		this.planetTransition = null;
+	}
+
+	_easeInOutCubic(t) {
+		return t < 0.5
+			? 4 * t * t * t
+			: 1 - Math.pow(-2 * t + 2, 3) / 2;
 	}
 
 	_handlePlanetTravelInput() {

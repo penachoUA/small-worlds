@@ -109,7 +109,7 @@ export default class PlanetBuilder {
 				rotation: -0.8
 			},
 			{
-				direction: new THREE.Vector3(-0.35, 0.85, -0.25),
+				direction: new THREE.Vector3(-0.35, 0.91, -0.31),
 				height: 0.48,
 				width: 0.045,
 				rotation: 1.4
@@ -134,7 +134,7 @@ export default class PlanetBuilder {
 			lavaPlanet.addProp(
 				lampPost,
 				config.direction,
-				0
+				0.001
 			);
 
 			lampPost.root.rotateY(config.rotation);
