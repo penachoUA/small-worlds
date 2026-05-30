@@ -3,6 +3,7 @@ import Windmill from '../entities/props/Windmill.js';
 import Tree from '../entities/props/Tree.js';
 import Volcano from '../entities/props/Volcano.js';
 import LampPost from '../entities/props/LampPost.js';
+import IceCrystalCluster from '../entities/props/IceCrystalCluster.js';
 
 const TALL_WINDMILL_DIR = new THREE.Vector3(-0.62, 1, 0.18);
 const SHORT_WINDMILL_DIR = new THREE.Vector3(0.88, 0.72, -0.52);
@@ -18,6 +19,7 @@ export default class PlanetBuilder {
 	populate() {
 		this._populateLavaPlanet();
 		this._populateGreenPlanet();
+		this._populateIcePlanet();
 	}
 
 	_populateLavaPlanet() {
@@ -42,6 +44,17 @@ export default class PlanetBuilder {
 
 		this._addGreenPlanetWindmills(greenPlanet);
 		this._addGreenPlanetTrees(greenPlanet);
+	}
+
+	_populateIcePlanet() {
+		const icePlanet = this.planets.ice;
+
+		if (!icePlanet) {
+			console.warn('Ice planet not found.');
+			return;
+		}
+
+		this._addIcePlanetCrystalClusters(icePlanet);
 	}
 
 	_addLavaPlanetVolcanoes(lavaPlanet) {
@@ -515,4 +528,142 @@ export default class PlanetBuilder {
 
 		tree.root.rotateY(config.rotation);
 	}
+
+	_addIcePlanetCrystalClusters(icePlanet) {
+		const frostPalettes = [
+			{
+				iceColor: 0xa9f2ff,
+				iceDarkColor: 0x8bdff3,
+				iceLightColor: 0xe7fdff,
+				baseColor: 0xc8edf5,
+				glowColor: 0xf4feff
+			},
+			{
+				iceColor: 0xb2eeff,
+				iceDarkColor: 0x93dcef,
+				iceLightColor: 0xf0fbff,
+				baseColor: 0xcdebf3,
+				glowColor: 0xf7feff
+			},
+			{
+				iceColor: 0xa2e8fb,
+				iceDarkColor: 0x86d5eb,
+				iceLightColor: 0xe4f9ff,
+				baseColor: 0xc2e6f0,
+				glowColor: 0xeffcff
+			}
+		];
+
+		const crystalConfigs = [
+			{
+				direction: new THREE.Vector3(0.25, 1, 0.2),
+				height: 0.65,
+				width: 0.42,
+				rotation: 0.2,
+				crystalCount: 5,
+				palette: 0
+			},
+			{
+				direction: new THREE.Vector3(0.55, 0.82, 0.35),
+				height: 0.46,
+				width: 0.30,
+				rotation: 1.4,
+				crystalCount: 4,
+				palette: 1
+			},
+			{
+				direction: new THREE.Vector3(-0.25, 0.95, 0.48),
+				height: 0.40,
+				width: 0.26,
+				rotation: -0.8,
+				crystalCount: 4,
+				palette: 2
+			},
+			{
+				direction: new THREE.Vector3(1.0, 0.05, -0.25),
+				height: 0.52,
+				width: 0.34,
+				rotation: 2.0,
+				crystalCount: 5,
+				palette: 0
+			},
+			{
+				direction: new THREE.Vector3(0.65, -0.1, -0.8),
+				height: 0.36,
+				width: 0.24,
+				rotation: -1.2,
+				crystalCount: 3,
+				palette: 1
+			},
+			{
+				direction: new THREE.Vector3(-0.95, 0.02, -0.3),
+				height: 0.50,
+				width: 0.32,
+				rotation: 2.7,
+				crystalCount: 5,
+				palette: 2
+			},
+			{
+				direction: new THREE.Vector3(-0.72, -0.12, 0.78),
+				height: 0.34,
+				width: 0.23,
+				rotation: 0.6,
+				crystalCount: 3,
+				palette: 0
+			},
+			{
+				direction: new THREE.Vector3(0.2, -0.95, 0.6),
+				height: 0.55,
+				width: 0.36,
+				rotation: -2.2,
+				crystalCount: 5,
+				palette: 1
+			},
+			{
+				direction: new THREE.Vector3(-0.35, -0.86, -0.55),
+				height: 0.42,
+				width: 0.28,
+				rotation: 1.8,
+				crystalCount: 4,
+				palette: 2
+			},
+			{
+				direction: new THREE.Vector3(0.78, -0.52, 0.15),
+				height: 0.32,
+				width: 0.22,
+				rotation: -0.3,
+				crystalCount: 3,
+				palette: 0
+			},
+			{
+				direction: new THREE.Vector3(-0.48, 0.65, -0.82),
+				height: 0.78,
+				width: 0.48,
+				rotation: -1.7,
+				crystalCount: 6,
+				palette: 1,
+			}
+		];
+
+		crystalConfigs.forEach((config, index) => {
+			const palette = frostPalettes[config.palette];
+
+			const cluster = new IceCrystalCluster({
+				height: config.height,
+				width: config.width,
+				crystalCount: config.crystalCount,
+				...palette,
+				phase: index * 0.9,
+			});
+
+			icePlanet.addProp(
+				cluster,
+				config.direction,
+				0.025
+			);
+
+			cluster.root.rotateY(config.rotation);
+		});
+	}
+
 }
