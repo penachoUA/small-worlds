@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import Windmill from '../entities/props/Windmill.js';
 import Tree from '../entities/props/Tree.js';
+import Volcano from '../entities/props/Volcano.js';
+import LampPost from '../entities/props/LampPost.js';
 
 const TALL_WINDMILL_DIR = new THREE.Vector3(-0.62, 1, 0.18);
 const SHORT_WINDMILL_DIR = new THREE.Vector3(0.88, 0.72, -0.52);
@@ -8,12 +10,26 @@ const SMALL_WINDMILL_DIR = new THREE.Vector3(-0.85, 0.62, -0.48);
 const SMALLER_WINDMILL_DIR = new THREE.Vector3(0.15, -1.0, 0.6);
 
 export default class PlanetBuilder {
-	constructor(planets) {
+	constructor(planets, assets = {}) {
 		this.planets = planets;
+		this.assets = assets;
 	}
 
 	populate() {
+		this._populateLavaPlanet();
 		this._populateGreenPlanet();
+	}
+
+	_populateLavaPlanet() {
+		const lavaPlanet = this.planets.lava;
+
+		if (!lavaPlanet) {
+			console.warn('Lava planet not found.');
+			return;
+		}
+
+		this._addLavaPlanetVolcanoes(lavaPlanet);
+		this._addLavaPlanetLampPosts(lavaPlanet);
 	}
 
 	_populateGreenPlanet() {
@@ -26,6 +42,88 @@ export default class PlanetBuilder {
 
 		this._addGreenPlanetWindmills(greenPlanet);
 		this._addGreenPlanetTrees(greenPlanet);
+	}
+
+	_addLavaPlanetVolcanoes(lavaPlanet) {
+		const volcanoConfigs = [
+			{
+				direction: new THREE.Vector3(0.2, 1, 0.15),
+				height: 0.09,
+				width: 0.16,
+				rotation: 0.3
+			},
+			{
+				direction: new THREE.Vector3(-0.55, 0.65, 0.4),
+				height: 0.08,
+				width: 0.13,
+				rotation: 1.7,
+				rockColor: 0x33140f
+			},
+			{
+				direction: new THREE.Vector3(0.62, -0.4, -0.55),
+				height: 0.07,
+				width: 0.14,
+				rotation: -1.2,
+				lavaColor: 0xff6a1f
+			}
+		];
+
+		volcanoConfigs.forEach((config, index) => {
+			const volcano = new Volcano({
+				height: config.height,
+				width: config.width,
+				phase: index * 1.2
+			});
+
+			lavaPlanet.addProp(
+				volcano,
+				config.direction,
+				0.04,
+			);
+
+			volcano.root.rotateY(config.rotation);
+		});
+	}
+
+	_addLavaPlanetLampPosts(lavaPlanet) {
+		const lampConfigs = [
+			{
+				direction: new THREE.Vector3(0.9, 0.2, 0.35),
+				height: 0.52,
+				width: 0.05,
+				rotation: -0.8
+			},
+			{
+				direction: new THREE.Vector3(-0.35, 0.85, -0.25),
+				height: 0.48,
+				width: 0.045,
+				rotation: 1.4
+			},
+			{
+				direction: new THREE.Vector3(-0.65, -0.35, 0.55),
+				height: 0.46,
+				width: 0.04,
+				rotation: 2.6
+			}
+		];
+
+		lampConfigs.forEach((config, index) => {
+			const lampPost = new LampPost({
+				gltf: this.assets.lampPostGLTF,
+				height: config.height,
+				width: config.width,
+				initiallyLit: true,
+				phase: index * 1.7
+			});
+
+			lavaPlanet.addProp(
+				lampPost,
+				config.direction,
+				0
+			);
+
+			lampPost.root.rotateY(config.rotation);
+		});
 	}
 
 	_addGreenPlanetWindmills(greenPlanet) {
