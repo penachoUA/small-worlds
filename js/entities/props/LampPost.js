@@ -118,7 +118,6 @@ export default class LampPost {
 
 		this.model.traverse((child) => {
 			if (!child.isMesh) return;
-			console.log(child.name, child.material?.name);
 
 			child.castShadow = true;
 			child.receiveShadow = true;

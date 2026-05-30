@@ -4,6 +4,7 @@ import Tree from '../entities/props/Tree.js';
 import Volcano from '../entities/props/Volcano.js';
 import LampPost from '../entities/props/LampPost.js';
 import IceCrystalCluster from '../entities/props/IceCrystalCluster.js';
+import Igloo from '../entities/props/Igloo.js';
 
 const TALL_WINDMILL_DIR = new THREE.Vector3(-0.62, 1, 0.18);
 const SHORT_WINDMILL_DIR = new THREE.Vector3(0.88, 0.72, -0.52);
@@ -55,6 +56,7 @@ export default class PlanetBuilder {
 		}
 
 		this._addIcePlanetCrystalClusters(icePlanet);
+		this._addIcePlanetIgloos(icePlanet);
 	}
 
 	_addLavaPlanetVolcanoes(lavaPlanet) {
@@ -666,4 +668,48 @@ export default class PlanetBuilder {
 		});
 	}
 
+	_addIcePlanetIgloos(icePlanet) {
+		const iglooConfigs = [
+			{
+				direction: new THREE.Vector3(0.86, 0.34, 0.62),
+				size: 1.18,
+				rotation: -1.9
+			},
+			{
+				direction: new THREE.Vector3(-0.78, 0.48, 0.18),
+				size: 1.02,
+				rotation: 0.95
+			},
+			{
+				direction: new THREE.Vector3(0.38, -0.72, -0.48),
+				size: 1.08,
+				rotation: 2.45
+			},
+			{
+				direction: new THREE.Vector3(-0.52, -0.62, 0.42),
+				size: 0.94,
+				rotation: -0.4
+			},
+			{
+				direction: new THREE.Vector3(0.12, 0.92, -0.42),
+				size: 1.10,
+				rotation: 3.0
+			}
+		];
+
+		iglooConfigs.forEach((config) => {
+			const igloo = new Igloo({
+				gltf: this.assets.iglooGLTF,
+				size: config.size,
+			});
+
+			icePlanet.addProp(
+				igloo,
+				config.direction,
+				0.04
+			);
+
+			igloo.root.rotateY(config.rotation);
+		});
+	}
 }

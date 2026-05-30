@@ -410,11 +410,13 @@ export default class Game {
 
 		this.playerGLTF = await loader.loadAsync('./assets/little-prince.glb');
 		this.lampPostGLTF = await loader.loadAsync('./assets/lamp_post.glb');
+		this.iglooGLTF = await loader.loadAsync('./assets/igloo.glb');
 	}
 
 	_initPlanetObjects() {
 		const builder = new PlanetBuilder(this.planets, {
-			lampPostGLTF: this.lampPostGLTF
+			lampPostGLTF: this.lampPostGLTF,
+			iglooGLTF: this.iglooGLTF
 		});
 
 		builder.populate();
