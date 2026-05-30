@@ -237,7 +237,8 @@ export default class Game {
 				orbitAngle: 2,
 				orbitInclination: -10,
 				rotationSpeed: 0.0044,
-				rotationAxis: 23
+				rotationAxis: 23,
+				terrainAmplitude: 0.045,
 			})
 		);
 
@@ -253,7 +254,8 @@ export default class Game {
 				orbitAngle: 4,
 				orbitInclination: 20,
 				rotationSpeed: 0.0024,
-				rotationAxis: 7
+				rotationAxis: 7,
+				terrainAmplitude: 0.025,
 			})
 		);
 
@@ -269,7 +271,8 @@ export default class Game {
 				orbitAngle: 0,
 				orbitInclination: 15,
 				rotationSpeed: 0.002,
-				rotationAxis: 12
+				rotationAxis: 12,
+				terrainAmplitude: 0.03,
 			})
 		);
 

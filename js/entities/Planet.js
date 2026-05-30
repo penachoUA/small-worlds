@@ -6,7 +6,13 @@ const CONFIG = {
 	SPHERE_SEGMENTS: 64,
 	ORBIT_LINE_SEGMENTS: 128,
 	AXES_SIZE: 3,
-	DEBUG_OPACITY: 0.5
+	DEBUG_OPACITY: 0.5,
+
+	TERRAIN_DEFAULT_AMPLITUDE: 0.025,
+
+	TERRAIN_LOW_FREQUENCY: 3,
+	TERRAIN_MID_FREQUENCY: 8,
+	TERRAIN_HIGH_FREQUENCY: 16
 };
 
 let nextPlanetId = 0;
@@ -37,10 +43,17 @@ export default class Planet {
 		orbitAngle,
 		orbitInclination,
 		rotationSpeed,
-		rotationAxis
+		rotationAxis,
+
+		terrainAmplitude = CONFIG.TERRAIN_DEFAULT_AMPLITUDE,
+		terrainSeed = null
 	}) {
 		this.id = nextPlanetId++;
 		this.name = name ?? `planet-${this.id}`;
+
+		this.radius = radius;
+		this.terrainAmplitude = terrainAmplitude;
+		this.terrainSeed = terrainSeed ?? orbitRadius;
 
 		// Root handles orbital inclination — tilting the entire orbit plane
 		this.root = new THREE.Object3D();
@@ -57,13 +70,14 @@ export default class Planet {
 		this.orbitPivot.add(this.axisTilt);
 
 		// Setup visual, mesh is the surface of the planet
-		const geometry = new THREE.SphereGeometry(
+		const geometry = Planet._createTerrainGeometry({
 			radius,
-			CONFIG.SPHERE_SEGMENTS,
-			CONFIG.SPHERE_SEGMENTS
-		);
+			segments: CONFIG.SPHERE_SEGMENTS,
+			amplitude: radius * terrainAmplitude,
+			seed: this.terrainSeed
+		});
 
-		const texture = Planet._generateTexture(color1, color2, color3, orbitRadius);
+		const texture = Planet._generateTexture(color1, color2, color3, this.terrainSeed);
 		const material = new THREE.MeshToonMaterial({
 			map: texture,
 			gradientMap: GRADIENT_MAP
@@ -73,7 +87,6 @@ export default class Planet {
 		this.mesh.receiveShadow = true;
 		this.axisTilt.add(this.mesh);
 
-		this.radius = radius;
 		this.orbitSpeed = orbitSpeed;
 		this.orbitAngle = orbitAngle;
 		this.rotationSpeed = rotationSpeed;
@@ -257,6 +270,65 @@ export default class Planet {
 		this.orbitPath = new THREE.LineLoop(geometry, material);
 	}
 
+	static _createTerrainGeometry({
+		radius,
+		segments,
+		amplitude,
+		seed
+	}) {
+		const geometry = new THREE.SphereGeometry(
+			radius,
+			segments,
+			segments
+		);
+
+		if (amplitude <= 0) {
+			return geometry;
+		}
+
+		const noise3D = createNoise3D(alea(seed));
+		const position = geometry.attributes.position;
+		const normal = new THREE.Vector3();
+		const vertex = new THREE.Vector3();
+
+		for (let i = 0; i < position.count; i++) {
+			vertex.fromBufferAttribute(position, i);
+			normal.copy(vertex).normalize();
+
+			const rawT = Planet._samplePlanetNoise(
+				noise3D,
+				normal.x,
+				normal.y,
+				normal.z
+			);
+
+			const colorHeight = (rawT - 0.5) * 2;
+
+			const detail =
+				noise3D(normal.x * 22, normal.y * 22, normal.z * 22) * 0.18 +
+				noise3D(normal.x * 38, normal.y * 38, normal.z * 38) * 0.08;
+
+			const displacement = amplitude * THREE.MathUtils.clamp(
+				colorHeight * 0.85 + detail,
+				-1,
+				1
+			);
+
+			vertex
+				.copy(normal)
+				.multiplyScalar(radius + displacement);
+
+			position.setXYZ(i, vertex.x, vertex.y, vertex.z);
+		}
+
+		position.needsUpdate = true;
+		geometry.computeVertexNormals();
+		geometry.computeBoundingSphere();
+		geometry.computeBoundingBox();
+
+		return geometry;
+	}
+
 	static _generateTexture(color1, color2, color3, seed) {
 		const noise3D = createNoise3D(alea(seed));
 
@@ -280,19 +352,7 @@ export default class Planet {
 				const ny = Math.sin(phi) * Math.sin(theta);
 				const nz = Math.cos(phi);
 
-				const rawT = Math.max(
-					0,
-					Math.min(
-						1,
-						(
-							noise3D(nx * 3, ny * 3, nz * 3) * 0.6 +
-							noise3D(nx * 8, ny * 8, nz * 8) * 0.3 +
-							noise3D(nx * 16, ny * 16, nz * 16) * 0.1 +
-							1
-						) / 2
-					)
-				);
-
+				const rawT = Planet._samplePlanetNoise(noise3D, nx, ny, nz);
 				const t = Math.floor(rawT * 8) / 8;
 
 				let r;
@@ -319,5 +379,32 @@ export default class Planet {
 		}
 
 		return new THREE.CanvasTexture(canvas);
+	}
+
+	static _samplePlanetNoise(noise3D, nx, ny, nz) {
+		return Math.max(
+			0,
+			Math.min(
+				1,
+				(
+					noise3D(
+						nx * CONFIG.TERRAIN_LOW_FREQUENCY,
+						ny * CONFIG.TERRAIN_LOW_FREQUENCY,
+						nz * CONFIG.TERRAIN_LOW_FREQUENCY
+					) * 0.6 +
+					noise3D(
+						nx * CONFIG.TERRAIN_MID_FREQUENCY,
+						ny * CONFIG.TERRAIN_MID_FREQUENCY,
+						nz * CONFIG.TERRAIN_MID_FREQUENCY
+					) * 0.3 +
+					noise3D(
+						nx * CONFIG.TERRAIN_HIGH_FREQUENCY,
+						ny * CONFIG.TERRAIN_HIGH_FREQUENCY,
+						nz * CONFIG.TERRAIN_HIGH_FREQUENCY
+					) * 0.1 +
+					1
+				) / 2
+			)
+		);
 	}
 }
