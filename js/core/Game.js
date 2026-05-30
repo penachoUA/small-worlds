@@ -8,6 +8,7 @@ import Player from '../entities/Player.js';
 import PlayerController from '../controllers/PlayerController.js';
 import CameraController from '../controllers/CameraController.js';
 import CameraRig from '../camera/CameraRig.js';
+import CameraTransitionEngine from '../camera/CameraTransitionEngine.js';
 import InputHandler from './InputHandler.js';
 import PlanetBuilder from '../world/PlanetBuilder.js';
 import Skybox from './Skybox.js';
@@ -71,9 +72,12 @@ export default class Game {
 		this.input = new InputHandler();
 		this.cameraRig = new CameraRig();
 
+		this.cameraTransitionEngine = new CameraTransitionEngine({
+			cameraRig: this.cameraRig
+		});
+
 		this.planets = {};
-		this.planetTransition = null;
-		this.cameraModeTransition = null;
+		this.planetTravel = null;
 
 		initComposer(this.cameraRig.camera);
 
@@ -85,7 +89,7 @@ export default class Game {
 			this._initControllers();
 			this._initResizeHandler();
 			this._initShadows();
-			this.setCameraMode('system');
+			this.setCameraMode(CAMERA_MODES.SYSTEM);
 
 			this.debugActive = !debug;
 			this._toggleDebugMode();
@@ -107,17 +111,15 @@ export default class Game {
 			planet.update(delta);
 		});
 
-		if (this.planetTransition) {
-			this._updatePlanetTransition(delta);
-			this._updateShadowLight();
+		if (this.cameraTransitionEngine.isActive) {
+			this.cameraTransitionEngine.update(delta);
 
-			getComposer().render();
-
-			if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
-				this._toggleDebugMode();
+			if (this.cameraTransitionEngine.consumeFinished()) {
+				this._handleCameraTransitionFinished();
 			}
 
-			this.input.afterUpdate();
+			this._updateShadowLight();
+			this._renderFrame();
 			return;
 		}
 
@@ -134,20 +136,6 @@ export default class Game {
 			this.cameraRig.clearVerticalStabilizer();
 		}
 
-		if (this.cameraModeTransition) {
-			this._updateCameraModeTransition(delta);
-			this._updateShadowLight();
-
-			getComposer().render();
-
-			if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
-				this._toggleDebugMode();
-			}
-
-			this.input.afterUpdate();
-			return;
-		}
-
 		if (this.input.isTapped(CONTROLS.CYCLE_CAMERA)) {
 			this.cycleCameraMode();
 		}
@@ -157,7 +145,10 @@ export default class Game {
 		this.activeCameraController.update(this.player.isMoving);
 
 		this._updateShadowLight();
+		this._renderFrame();
+	}
 
+	_renderFrame() {
 		getComposer().render();
 
 		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
@@ -167,10 +158,23 @@ export default class Game {
 		this.input.afterUpdate();
 	}
 
+	_handleCameraTransitionFinished() {
+		if (!this.planetTravel) return;
+
+		if (this.planetTravel.phase === 'pullOut') {
+			this._startPlanetTravelPushIn();
+			return;
+		}
+
+		if (this.planetTravel.phase === 'pushIn') {
+			this._finishPlanetTravel();
+		}
+	}
+
 	transitionToCameraMode(mode) {
 		if (this.cameraMode === mode) return;
 
-		if (this.planetTransition || this.cameraModeTransition) return;
+		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
 		if (this._canUseLocalCameraModeTransition(this.cameraMode, mode)) {
 			this._startLocalCameraModeTransition(mode);
@@ -189,95 +193,27 @@ export default class Game {
 	}
 
 	_startLocalCameraModeTransition(targetMode) {
-		const fromMode = this.cameraMode;
-
 		const startRigPosition = this.cameraRig.root.position.clone();
 		const startCameraPosition = this.cameraRig.camera.position.clone();
 		const startFov = this.cameraRig.camera.fov;
 
-		/*
-			Apply the target mode to capture its desired local setup.
-			Since third-person and first-person share the same parent, this is safe.
-		*/
 		this.setCameraMode(targetMode);
 
 		const targetRigPosition = this.cameraRig.root.position.clone();
 		const targetCameraPosition = this.cameraRig.camera.position.clone();
 		const targetFov = this.cameraRig.camera.fov;
 
-		/*
-			Restore starting visual state, but keep logical mode/controller as target.
-			That means input is frozen during transition, then target mode is already active.
-		*/
 		this.cameraRig.root.position.copy(startRigPosition);
 		this.cameraRig.camera.position.copy(startCameraPosition);
 		this.cameraRig.camera.fov = startFov;
 		this.cameraRig.camera.updateProjectionMatrix();
 
-		this.cameraModeTransition = {
-			fromMode,
-			targetMode,
-			elapsed: 0,
+		this.cameraTransitionEngine.start({
 			duration: CAMERA_MODE_TRANSITION.DURATION,
-
-			startRigPosition,
 			targetRigPosition,
-			startCameraPosition,
 			targetCameraPosition,
-			startFov,
 			targetFov
-		};
-	}
-
-	_updateCameraModeTransition(delta) {
-		const transition = this.cameraModeTransition;
-		if (!transition) return;
-
-		transition.elapsed += delta;
-
-		const rawT = THREE.MathUtils.clamp(
-			transition.elapsed / transition.duration,
-			0,
-			1
-		);
-
-		const t = this._easeInOutCubic(rawT);
-
-		this.cameraRig.root.position.lerpVectors(
-			transition.startRigPosition,
-			transition.targetRigPosition,
-			t
-		);
-
-		this.cameraRig.camera.position.lerpVectors(
-			transition.startCameraPosition,
-			transition.targetCameraPosition,
-			t
-		);
-
-		this.cameraRig.camera.fov = THREE.MathUtils.lerp(
-			transition.startFov,
-			transition.targetFov,
-			t
-		);
-
-		this.cameraRig.camera.updateProjectionMatrix();
-
-		if (rawT >= 1) {
-			this._finishCameraModeTransition();
-		}
-	}
-
-	_finishCameraModeTransition() {
-		const transition = this.cameraModeTransition;
-		if (!transition) return;
-
-		this.cameraRig.root.position.copy(transition.targetRigPosition);
-		this.cameraRig.camera.position.copy(transition.targetCameraPosition);
-		this.cameraRig.camera.fov = transition.targetFov;
-		this.cameraRig.camera.updateProjectionMatrix();
-
-		this.cameraModeTransition = null;
+		});
 	}
 
 	_canUseLocalCameraModeTransition(fromMode, toMode) {
@@ -288,6 +224,7 @@ export default class Game {
 
 		return localModes.includes(fromMode) && localModes.includes(toMode);
 	}
+
 	_setActiveCameraController(mode) {
 		this.activeCameraController = this.cameraControllers[mode] ?? null;
 	}
@@ -369,7 +306,7 @@ export default class Game {
 	}
 
 	cycleCameraMode() {
-		if (this.planetTransition || this.cameraModeTransition) return;
+		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
 		const modesArray = Object.values(CAMERA_MODES);
 		const i = modesArray.indexOf(this.cameraMode);
@@ -378,7 +315,7 @@ export default class Game {
 	}
 
 	changePlanet(planetId) {
-		if (this.planetTransition || this.cameraModeTransition) return;
+		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
 		if (
 			this.cameraMode === CAMERA_MODES.SYSTEM ||
@@ -398,144 +335,76 @@ export default class Game {
 			return;
 		}
 
-		this._startPlanetTransition(targetPlanet);
+		this._startPlanetTravel(targetPlanet);
 	}
 
-	_startPlanetTransition(targetPlanet) {
-		/*
-			Simple local teleport pulse.
-
-			Important:
-			setCameraMode(THIRD_PERSON) happens before capturing startCameraPosition,
-			so every transition starts from the canonical third-person camera distance,
-			not from a previously pulled-back transition distance.
-		*/
+	_startPlanetTravel(targetPlanet) {
 		this.setCameraMode(CAMERA_MODES.THIRD_PERSON);
 
-		const startCameraPosition = this.cameraRig.camera.position.clone();
-		const farCameraPosition = startCameraPosition.clone();
+		const normalCameraPosition = this.cameraRig.camera.position.clone();
+		const pulledBackCameraPosition = normalCameraPosition.clone();
 
-		farCameraPosition.z = Math.max(
-			startCameraPosition.z * PLANET_TRANSITION.PULLBACK_MULTIPLIER,
+		pulledBackCameraPosition.z = Math.max(
+			normalCameraPosition.z * PLANET_TRANSITION.PULLBACK_MULTIPLIER,
 			PLANET_TRANSITION.MIN_FAR_DISTANCE
 		);
 
-		farCameraPosition.y = startCameraPosition.y * 1.15;
+		pulledBackCameraPosition.y = normalCameraPosition.y * 1.15;
 
-		this.planetTransition = {
+		this.planetTravel = {
 			targetPlanet,
-			elapsed: 0,
-			duration: PLANET_TRANSITION.DURATION,
-			switched: false,
-
-			startCameraPosition,
-			farCameraPosition,
-			targetCameraPosition: startCameraPosition.clone(),
-
-			startFov: this.cameraRig.camera.fov,
-			peakFov: PLANET_TRANSITION.FOV_PEAK,
-			targetFov: this.cameraRig.camera.fov
+			phase: 'pullOut',
+			normalCameraPosition,
+			pulledBackCameraPosition,
+			normalFov: this.cameraRig.camera.fov,
+			peakFov: PLANET_TRANSITION.FOV_PEAK
 		};
+
+		this.cameraTransitionEngine.start({
+			duration: PLANET_TRANSITION.DURATION * 0.5,
+			targetCameraPosition: pulledBackCameraPosition,
+			targetFov: PLANET_TRANSITION.FOV_PEAK
+		});
 	}
 
-	_updatePlanetTransition(delta) {
-		const transition = this.planetTransition;
-		if (!transition) return;
+	_startPlanetTravelPushIn() {
+		const travel = this.planetTravel;
+		if (!travel) return;
 
-		transition.elapsed += delta;
+		travel.phase = 'pushIn';
 
-		const rawT = THREE.MathUtils.clamp(
-			transition.elapsed / transition.duration,
-			0,
-			1
-		);
-
-		if (rawT >= 0.5 && !transition.switched) {
-			this._switchPlanetAtTransitionPeak(transition);
-		}
-
-		if (rawT < 0.5) {
-			const t = this._easeInOutCubic(rawT / 0.5);
-
-			this.cameraRig.camera.position.lerpVectors(
-				transition.startCameraPosition,
-				transition.farCameraPosition,
-				t
-			);
-
-			this.cameraRig.camera.fov = THREE.MathUtils.lerp(
-				transition.startFov,
-				transition.peakFov,
-				t
-			);
-		} else {
-			const t = this._easeInOutCubic((rawT - 0.5) / 0.5);
-
-			this.cameraRig.camera.position.lerpVectors(
-				transition.farCameraPosition,
-				transition.targetCameraPosition,
-				t
-			);
-
-			this.cameraRig.camera.fov = THREE.MathUtils.lerp(
-				transition.peakFov,
-				transition.targetFov,
-				t
-			);
-		}
-
-		this.cameraRig.camera.updateProjectionMatrix();
-
-		if (rawT >= 1) {
-			this._finishPlanetTransition();
-		}
-	}
-
-	_switchPlanetAtTransitionPeak(transition) {
-		transition.switched = true;
-
-		this.currentPlanet = transition.targetPlanet;
+		this.currentPlanet = travel.targetPlanet;
 		this.player.moveToPlanet(this.currentPlanet);
 		this._configureShadowCamera();
 
-		/*
-			Reset to the correct third-person setup for the new planet/player.
-			Then capture that as the real target.
-		*/
 		this.setCameraMode(CAMERA_MODES.THIRD_PERSON);
 
-		transition.targetCameraPosition.copy(this.cameraRig.camera.position);
-		transition.targetFov = transition.startFov;
+		const targetCameraPosition = this.cameraRig.camera.position.clone();
+		const targetFov = this.cameraRig.camera.fov;
 
-		/*
-			Continue the visual transition from the pulled-back position.
-			Do not let the temporary far distance become the new normal distance.
-		*/
-		this.cameraRig.camera.position.copy(transition.farCameraPosition);
-		this.cameraRig.camera.fov = transition.peakFov;
-		this.cameraRig.camera.updateProjectionMatrix();
-	}
-
-	_finishPlanetTransition() {
-		const transition = this.planetTransition;
-		if (!transition) return;
-
-		/*
-			End exactly at the captured target position.
-			Do not call setCameraMode() here, because that would reset the camera
-			after the lerp and can create a visible snap.
-		*/
-		this.cameraRig.camera.position.copy(transition.targetCameraPosition);
-		this.cameraRig.camera.fov = transition.targetFov;
+		this.cameraRig.camera.position.copy(travel.pulledBackCameraPosition);
+		this.cameraRig.camera.fov = travel.peakFov;
 		this.cameraRig.camera.updateProjectionMatrix();
 
-		this.planetTransition = null;
+		this.cameraTransitionEngine.start({
+			duration: PLANET_TRANSITION.DURATION * 0.5,
+			targetCameraPosition,
+			targetFov
+		});
 	}
 
-	_easeInOutCubic(t) {
-		return t < 0.5
-			? 4 * t * t * t
-			: 1 - Math.pow(-2 * t + 2, 3) / 2;
+	_finishPlanetTravel() {
+		const travel = this.planetTravel;
+		if (!travel) return;
+
+		this.cameraRig.camera.position.copy(this._getCameraModeCameraPosition(
+			CAMERA_MODES.THIRD_PERSON
+		));
+
+		this.cameraRig.camera.fov = travel.normalFov;
+		this.cameraRig.camera.updateProjectionMatrix();
+
+		this.planetTravel = null;
 	}
 
 	_handlePlanetTravelInput() {
