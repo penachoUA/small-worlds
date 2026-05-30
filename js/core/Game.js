@@ -163,38 +163,76 @@ export default class Game {
 	_applyCameraModeRig(mode) {
 		switch (mode) {
 			case CAMERA_MODES.THIRD_PERSON:
-				this.player.attachToModel(this.cameraRig);
-				this.cameraRig.setPosition(0, this.player.height * 0.01, 0);
-				this.cameraRig.setCameraPosition(
-					0,
-					this.player.height * 0.6,
-					this.player.height * 1.3
-				);
-				break;
-
 			case CAMERA_MODES.FIRST_PERSON:
 				this.player.attachToModel(this.cameraRig);
-				this.cameraRig.setPosition(0, this.player.height * 0.8, 0);
-				this.cameraRig.setCameraPosition(0, 0, 0);
 				break;
 
 			case CAMERA_MODES.PLANET:
 				this.currentPlanet.addPivotToPlanet(this.cameraRig);
-				this.cameraRig.setPosition(0, 0, 0);
-				this.cameraRig.setCameraPosition(0, 0, this.currentPlanet.radius * 2);
 				break;
 
 			case CAMERA_MODES.SYSTEM:
 				this.cameraRig.addTo(scene);
-				this.cameraRig.setPosition(0, 0, 0);
-				this.cameraRig.setCameraPosition(0, 0, 70);
 				break;
 		}
+
+		const rigPosition = this._getCameraModeRigPosition(mode);
+		const cameraPosition = this._getCameraModeCameraPosition(mode);
+
+		this.cameraRig.setPosition(
+			rigPosition.x,
+			rigPosition.y,
+			rigPosition.z
+		);
+
+		this.cameraRig.setCameraPosition(
+			cameraPosition.x,
+			cameraPosition.y,
+			cameraPosition.z
+		);
 	}
 
 	_resetActiveCameraController() {
 		if (this.activeCameraController) {
 			this.activeCameraController.reset();
+		}
+	}
+
+	_getCameraModeRigPosition(mode, target = new THREE.Vector3()) {
+		switch (mode) {
+			case CAMERA_MODES.THIRD_PERSON:
+				return target.set(0, this.player.height * 0.01, 0);
+
+			case CAMERA_MODES.FIRST_PERSON:
+				return target.set(0, this.player.height * 0.8, 0);
+
+			case CAMERA_MODES.PLANET:
+			case CAMERA_MODES.SYSTEM:
+			default:
+				return target.set(0, 0, 0);
+		}
+	}
+
+	_getCameraModeCameraPosition(mode, target = new THREE.Vector3()) {
+		switch (mode) {
+			case CAMERA_MODES.THIRD_PERSON:
+				return target.set(
+					0,
+					this.player.height * 0.6,
+					this.player.height * 1.3
+				);
+
+			case CAMERA_MODES.FIRST_PERSON:
+				return target.set(0, 0, 0);
+
+			case CAMERA_MODES.PLANET:
+				return target.set(0, 0, this.currentPlanet.radius * 2);
+
+			case CAMERA_MODES.SYSTEM:
+				return target.set(0, 0, 70);
+
+			default:
+				return target.set(0, 0, 0);
 		}
 	}
 
