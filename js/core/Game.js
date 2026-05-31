@@ -45,25 +45,27 @@ const CAMERA_CONFIGS = {
 	[CAMERA_MODES.PLANET]: {
 		sensitivity: 0.0035,
 		unconstrained: true,
+		autoCenter: true,
 	},
 	[CAMERA_MODES.SYSTEM]: {
 		sensitivity: 0.003,
 		minPitch: -Math.PI / 2,
 		maxPitch: Math.PI / 2,
+		autoCenter: true,
 		pitch: -0.2
 	}
 };
 
-const PLANET_TRANSITION = {
-	DURATION: 0.9,
-	PULLBACK_MULTIPLIER: 2.15,
-	FOV_PEAK: 96,
-	MIN_FAR_DISTANCE: 1.8
+const PLANET_TRAVEL_TRANSITION = {
+	DURATION: 0.9
 };
 
 const CAMERA_MODE_TRANSITION = {
 	DURATION: 0.35
 };
+
+const _planetWorldPosition = new THREE.Vector3();
+const _sunDirection = new THREE.Vector3();
 
 export default class Game {
 	constructor(onReady = null, debug = false) {
@@ -73,9 +75,13 @@ export default class Game {
 		this.cameraRig = new CameraRig();
 
 		this.cameraTransitionEngine = new CameraTransitionEngine({
-			cameraRig: this.cameraRig
+			cameraRig: this.cameraRig,
+			scene,
+			getPlayer: () => this.player,
+			getCurrentPlanet: () => this.currentPlanet,
+			modes: CAMERA_MODES,
+			defaultDuration: CAMERA_MODE_TRANSITION.DURATION
 		});
-		this.pendingCameraControllerReset = false;
 
 		this.planets = {};
 		this.planetTravel = null;
@@ -84,12 +90,14 @@ export default class Game {
 
 		this._loadAssets().then(() => {
 			this.skybox = new Skybox().addTo(scene);
+
 			this._initLighting();
 			this._initSystem();
 			this._initPlayer();
 			this._initControllers();
 			this._initResizeHandler();
 			this._initShadows();
+
 			this.setCameraMode(CAMERA_MODES.SYSTEM);
 
 			this.debugActive = !debug;
@@ -124,247 +132,38 @@ export default class Game {
 			return;
 		}
 
-		if (
-			this.cameraMode === CAMERA_MODES.THIRD_PERSON ||
-			this.cameraMode === CAMERA_MODES.FIRST_PERSON
-		) {
-			this.playerController.update(delta);
-			this.cameraRig.stabilizeVerticalTarget(
-				this.player.playerModel.position.y,
-				0.035
-			);
-		} else {
-			this.cameraRig.clearVerticalStabilizer();
-		}
+		this._updatePlayerAndCamera(delta);
+		this._handleInput();
 
-		if (this.input.isTapped(CONTROLS.CYCLE_CAMERA)) {
-			this.cycleCameraMode();
-		}
-
-		this._handlePlanetTravelInput();
-
-		this.activeCameraController.update(this.player.isMoving);
+		this.activeCameraController?.update(this.player.isMoving);
 
 		this._updateShadowLight();
 		this._renderFrame();
 	}
 
-	_renderFrame() {
-		getComposer().render();
+	setCameraMode(mode) {
+		this.cameraMode = mode;
 
-		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
-			this._toggleDebugMode();
-		}
-
-		this.input.afterUpdate();
-	}
-
-	_handleCameraTransitionFinished() {
-		if (this.pendingCameraControllerReset) {
-			this.pendingCameraControllerReset = false;
-			this._resetActiveCameraController();
-		}
-
-		if (!this.planetTravel) return;
-
-		if (this.planetTravel.phase === 'pullOut') {
-			this._startPlanetTravelPushIn();
-			return;
-		}
-
-		if (this.planetTravel.phase === 'pushIn') {
-			this._finishPlanetTravel();
-		}
+		this._activateCameraController(mode);
+		this.cameraTransitionEngine.setMode(mode);
+		this.activeCameraController?.reset();
 	}
 
 	transitionToCameraMode(mode) {
 		if (this.cameraMode === mode) return;
-
 		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
-		if (this._canUseLocalCameraModeTransition(this.cameraMode, mode)) {
-			this._startLocalCameraModeTransition(mode);
-			return;
-		}
-
-		if (this._canUseParentChangingCameraModeTransition(this.cameraMode, mode)) {
-			this._startParentChangingCameraModeTransition(mode);
-			return;
-		}
-
-		this.setCameraMode(mode);
-	}
-
-	setCameraMode(mode) {
-		this.cameraMode = mode;
-
-		this._setActiveCameraController(mode);
-		this._applyCameraModeRig(mode);
-		this._resetActiveCameraController();
-	}
-
-	_startLocalCameraModeTransition(targetMode) {
-		const startRigPosition = this.cameraRig.root.position.clone();
-		const startCameraPosition = this.cameraRig.camera.position.clone();
-		const startFov = this.cameraRig.camera.fov;
-
-		this.setCameraMode(targetMode);
-
-		const targetRigPosition = this.cameraRig.root.position.clone();
-		const targetCameraPosition = this.cameraRig.camera.position.clone();
-		const targetFov = this.cameraRig.camera.fov;
-
-		this.cameraRig.root.position.copy(startRigPosition);
-		this.cameraRig.camera.position.copy(startCameraPosition);
-		this.cameraRig.camera.fov = startFov;
-		this.cameraRig.camera.updateProjectionMatrix();
-
-		this.cameraTransitionEngine.start({
-			duration: CAMERA_MODE_TRANSITION.DURATION,
-			targetRigPosition,
-			targetCameraPosition,
-			targetFov
-		});
-	}
-
-	_canUseLocalCameraModeTransition(fromMode, toMode) {
-		const localModes = [
-			CAMERA_MODES.THIRD_PERSON,
-			CAMERA_MODES.FIRST_PERSON
-		];
-
-		return localModes.includes(fromMode) && localModes.includes(toMode);
-	}
-
-	_setActiveCameraController(mode) {
-		this.activeCameraController = this.cameraControllers[mode] ?? null;
-	}
-
-	_startParentChangingCameraModeTransition(targetMode) {
-		const parent = this._getCameraModeParent(targetMode);
-
-		this.cameraMode = targetMode;
-		this._setActiveCameraController(targetMode);
-
-		/*
-			Reparent while preserving current world transform.
-			This avoids the immediate visual snap caused by parent changes.
-		*/
-		this.cameraRig.attachTo(parent, true);
-
-		const targetRigPosition = this._getCameraModeRigPosition(targetMode);
-		const targetCameraPosition = this._getCameraModeCameraPosition(targetMode);
-
-		this.pendingCameraControllerReset = true;
-
-		this.cameraTransitionEngine.start({
-			duration: CAMERA_MODE_TRANSITION.DURATION * 1.4,
-			targetRigPosition,
-			targetRigQuaternion: new THREE.Quaternion(),
-			targetCameraPosition,
-			targetFov: this.cameraRig.camera.fov
-		});
-	}
-
-	_canUseParentChangingCameraModeTransition(fromMode, toMode) {
-		const supportedModes = [
-			CAMERA_MODES.THIRD_PERSON,
-			CAMERA_MODES.FIRST_PERSON,
-			CAMERA_MODES.SYSTEM
-		];
-
-		return supportedModes.includes(fromMode) && supportedModes.includes(toMode);
-	}
-
-	_applyCameraModeRig(mode) {
-		const parent = this._getCameraModeParent(mode);
-
-		this.cameraRig.attachTo(parent);
-
-		const rigPosition = this._getCameraModeRigPosition(mode);
-		const cameraPosition = this._getCameraModeCameraPosition(mode);
-
-		this.cameraRig.root.quaternion.identity();
-
-		this.cameraRig.setPosition(
-			rigPosition.x,
-			rigPosition.y,
-			rigPosition.z
-		);
-
-		this.cameraRig.setCameraPosition(
-			cameraPosition.x,
-			cameraPosition.y,
-			cameraPosition.z
-		);
-	}
-
-	_resetActiveCameraController() {
-		if (this.activeCameraController) {
-			this.activeCameraController.reset();
-		}
-	}
-
-	_getCameraModeRigPosition(mode, target = new THREE.Vector3()) {
-		switch (mode) {
-			case CAMERA_MODES.THIRD_PERSON:
-				return target.set(0, this.player.height * 0.01, 0);
-
-			case CAMERA_MODES.FIRST_PERSON:
-				return target.set(0, this.player.height * 0.8, 0);
-
-			case CAMERA_MODES.PLANET:
-			case CAMERA_MODES.SYSTEM:
-			default:
-				return target.set(0, 0, 0);
-		}
-	}
-
-	_getCameraModeCameraPosition(mode, target = new THREE.Vector3()) {
-		switch (mode) {
-			case CAMERA_MODES.THIRD_PERSON:
-				return target.set(
-					0,
-					this.player.height * 0.6,
-					this.player.height * 1.3
-				);
-
-			case CAMERA_MODES.FIRST_PERSON:
-				return target.set(0, 0, 0);
-
-			case CAMERA_MODES.PLANET:
-				return target.set(0, 0, this.currentPlanet.radius * 2);
-
-			case CAMERA_MODES.SYSTEM:
-				return target.set(0, 0, 70);
-
-			default:
-				return target.set(0, 0, 0);
-		}
-	}
-
-	_getCameraModeParent(mode) {
-		switch (mode) {
-			case CAMERA_MODES.THIRD_PERSON:
-			case CAMERA_MODES.FIRST_PERSON:
-				return this.player.playerModel;
-
-			case CAMERA_MODES.PLANET:
-				return this.currentPlanet.mesh;
-
-			case CAMERA_MODES.SYSTEM:
-			default:
-				return scene;
-		}
+		this._startCameraModeTransition(mode);
 	}
 
 	cycleCameraMode() {
 		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
-		const modesArray = Object.values(CAMERA_MODES);
-		const i = modesArray.indexOf(this.cameraMode);
+		const modes = Object.values(CAMERA_MODES);
+		const index = modes.indexOf(this.cameraMode);
+		const nextMode = modes[(index + 1) % modes.length];
 
-		this.transitionToCameraMode(modesArray[(i + 1) % modesArray.length]);
+		this.transitionToCameraMode(nextMode);
 	}
 
 	changePlanet(planetId) {
@@ -384,79 +183,119 @@ export default class Game {
 			return;
 		}
 
-		if (targetPlanet === this.currentPlanet) {
-			return;
-		}
+		if (targetPlanet === this.currentPlanet) return;
 
 		this._startPlanetTravel(targetPlanet);
 	}
 
-	_startPlanetTravel(targetPlanet) {
-		this.setCameraMode(CAMERA_MODES.THIRD_PERSON);
+	_updatePlayerAndCamera(delta) {
+		if (
+			this.cameraMode === CAMERA_MODES.THIRD_PERSON ||
+			this.cameraMode === CAMERA_MODES.FIRST_PERSON
+		) {
+			this.playerController.update(delta);
 
-		const normalCameraPosition = this.cameraRig.camera.position.clone();
-		const pulledBackCameraPosition = normalCameraPosition.clone();
+			this.cameraRig.stabilizeVerticalTarget(
+				this.player.playerModel.position.y,
+				0.035
+			);
+		} else {
+			this.cameraRig.clearVerticalStabilizer();
+		}
+	}
 
-		pulledBackCameraPosition.z = Math.max(
-			normalCameraPosition.z * PLANET_TRANSITION.PULLBACK_MULTIPLIER,
-			PLANET_TRANSITION.MIN_FAR_DISTANCE
-		);
+	_handleInput() {
+		if (this.input.isTapped(CONTROLS.CYCLE_CAMERA)) {
+			this.cycleCameraMode();
+		}
 
-		pulledBackCameraPosition.y = normalCameraPosition.y * 1.15;
+		this._handlePlanetTravelInput();
+	}
 
-		this.planetTravel = {
-			targetPlanet,
-			phase: 'pullOut',
-			normalCameraPosition,
-			pulledBackCameraPosition,
-			normalFov: this.cameraRig.camera.fov,
-			peakFov: PLANET_TRANSITION.FOV_PEAK
-		};
+	_renderFrame() {
+		getComposer().render();
 
-		this.cameraTransitionEngine.start({
-			duration: PLANET_TRANSITION.DURATION * 0.5,
-			targetCameraPosition: pulledBackCameraPosition,
-			targetFov: PLANET_TRANSITION.FOV_PEAK
+		if (this.input.isTapped(CONTROLS.TOGGLE_DEBUG)) {
+			this._toggleDebugMode();
+		}
+
+		this.input.afterUpdate();
+	}
+
+	_startCameraModeTransition(mode, duration = CAMERA_MODE_TRANSITION.DURATION) {
+		if (this.cameraMode === mode) return false;
+
+		this.cameraMode = mode;
+		this._activateCameraController(mode);
+
+		const started = this.cameraTransitionEngine.transitionToMode(mode, {
+			duration
+		});
+
+		if (!started) {
+			this.activeCameraController?.reset();
+		}
+
+		return started;
+	}
+
+	_handleCameraTransitionFinished() {
+		if (this.planetTravel?.phase === 'toSystem') {
+			this._transitionFromSystemToPlanet();
+			return;
+		}
+
+		if (this.planetTravel?.phase === 'toTarget') {
+			this._finishPlanetTravel();
+		}
+
+		this.activeCameraController?.startAutoCenter?.();
+	}
+
+	_activateCameraController(mode) {
+		this.activeCameraController = this.cameraControllers[mode] ?? null;
+
+		Object.entries(this.cameraControllers).forEach(([otherMode, controller]) => {
+			if (otherMode === mode) return;
+
+			controller.resetState?.();
 		});
 	}
 
-	_startPlanetTravelPushIn() {
+	_startPlanetTravel(targetPlanet) {
+		const returnMode = this.cameraMode === CAMERA_MODES.FIRST_PERSON
+			? CAMERA_MODES.FIRST_PERSON
+			: CAMERA_MODES.THIRD_PERSON;
+
+		this.planetTravel = {
+			targetPlanet,
+			returnMode,
+			phase: 'toSystem'
+		};
+
+		this._startCameraModeTransition(
+			CAMERA_MODES.SYSTEM,
+			PLANET_TRAVEL_TRANSITION.DURATION * 0.5
+		);
+	}
+
+	_transitionFromSystemToPlanet() {
 		const travel = this.planetTravel;
 		if (!travel) return;
 
-		travel.phase = 'pushIn';
+		travel.phase = 'toTarget';
 
 		this.currentPlanet = travel.targetPlanet;
 		this.player.moveToPlanet(this.currentPlanet);
 		this._configureShadowCamera();
 
-		this.setCameraMode(CAMERA_MODES.THIRD_PERSON);
-
-		const targetCameraPosition = this.cameraRig.camera.position.clone();
-		const targetFov = this.cameraRig.camera.fov;
-
-		this.cameraRig.camera.position.copy(travel.pulledBackCameraPosition);
-		this.cameraRig.camera.fov = travel.peakFov;
-		this.cameraRig.camera.updateProjectionMatrix();
-
-		this.cameraTransitionEngine.start({
-			duration: PLANET_TRANSITION.DURATION * 0.5,
-			targetCameraPosition,
-			targetFov
-		});
+		this._startCameraModeTransition(
+			travel.returnMode,
+			PLANET_TRAVEL_TRANSITION.DURATION * 0.5
+		);
 	}
 
 	_finishPlanetTravel() {
-		const travel = this.planetTravel;
-		if (!travel) return;
-
-		this.cameraRig.camera.position.copy(this._getCameraModeCameraPosition(
-			CAMERA_MODES.THIRD_PERSON
-		));
-
-		this.cameraRig.camera.fov = travel.normalFov;
-		this.cameraRig.camera.updateProjectionMatrix();
-
 		this.planetTravel = null;
 	}
 
@@ -470,23 +309,20 @@ export default class Game {
 		}
 	}
 
-	_addPlanet(planet) {
-		this.planets[planet.name] = planet;
-		return planet;
-	}
+	// ---------------------------------------------------------------------
+	// Scene setup
+	// ---------------------------------------------------------------------
 
-	_getPlanetList() {
-		return Object.values(this.planets).sort((a, b) => a.id - b.id);
-	}
+	async _loadAssets() {
+		const loader = new GLTFLoader();
 
-	_getPlanetById(id) {
-		return this._getPlanetList().find((planet) => planet.id === id);
+		this.playerGLTF = await loader.loadAsync('./assets/little-prince.glb');
+		this.lampPostGLTF = await loader.loadAsync('./assets/lamp_post.glb');
+		this.iglooGLTF = await loader.loadAsync('./assets/igloo.glb');
 	}
 
 	_initLighting() {
-		this.shadowLight = new THREE.DirectionalLight(0xffffff, 1.0);
 		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
-
 		scene.add(this.ambientLight);
 	}
 
@@ -575,29 +411,29 @@ export default class Game {
 		});
 
 		this.cameraControllers = {
-			thirdPerson: new CameraController({
+			[CAMERA_MODES.THIRD_PERSON]: new CameraController({
 				cameraRig: this.cameraRig,
 				input: this.input,
 				config: CAMERA_CONFIGS[CAMERA_MODES.THIRD_PERSON]
 			}),
-			firstPerson: new CameraController({
+			[CAMERA_MODES.FIRST_PERSON]: new CameraController({
 				cameraRig: this.cameraRig,
 				input: this.input,
 				config: CAMERA_CONFIGS[CAMERA_MODES.FIRST_PERSON]
 			}),
-			planet: new CameraController({
+			[CAMERA_MODES.PLANET]: new CameraController({
 				cameraRig: this.cameraRig,
 				input: this.input,
 				config: CAMERA_CONFIGS[CAMERA_MODES.PLANET]
 			}),
-			system: new CameraController({
+			[CAMERA_MODES.SYSTEM]: new CameraController({
 				cameraRig: this.cameraRig,
 				input: this.input,
 				config: CAMERA_CONFIGS[CAMERA_MODES.SYSTEM]
 			})
 		};
 
-		this.activeCameraController = this.cameraControllers.thirdPerson;
+		this.activeCameraController = this.cameraControllers[CAMERA_MODES.THIRD_PERSON];
 	}
 
 	_initResizeHandler() {
@@ -626,18 +462,47 @@ export default class Game {
 		this._configureShadowCamera();
 	}
 
+	_initPlanetObjects() {
+		const builder = new PlanetBuilder(this.planets, {
+			lampPostGLTF: this.lampPostGLTF,
+			iglooGLTF: this.iglooGLTF
+		});
+
+		builder.populate();
+	}
+
+	// ---------------------------------------------------------------------
+	// Planets
+	// ---------------------------------------------------------------------
+
+	_addPlanet(planet) {
+		this.planets[planet.name] = planet;
+		return planet;
+	}
+
+	_getPlanetList() {
+		return Object.values(this.planets).sort((a, b) => a.id - b.id);
+	}
+
+	_getPlanetById(id) {
+		return this._getPlanetList().find((planet) => planet.id === id);
+	}
+
+	// ---------------------------------------------------------------------
+	// Shadows
+	// ---------------------------------------------------------------------
+
 	_configureShadowCamera() {
 		if (!this.currentPlanet) return;
 
 		const r = this.currentPlanet.radius;
 		const cam = this.shadowLight.shadow.camera;
+		const size = r * 2;
 
-		const s = r * 2;
-
-		cam.left = -s;
-		cam.right = s;
-		cam.top = s;
-		cam.bottom = -s;
+		cam.left = -size;
+		cam.right = size;
+		cam.top = size;
+		cam.bottom = -size;
 		cam.near = r * 3;
 		cam.far = r * 7;
 		cam.updateProjectionMatrix();
@@ -646,55 +511,44 @@ export default class Game {
 	_updateShadowLight() {
 		if (!this.currentPlanet) return;
 
-		const planetPos = new THREE.Vector3();
+		this.currentPlanet.mesh.getWorldPosition(_planetWorldPosition);
 
-		this.currentPlanet.mesh.getWorldPosition(planetPos);
+		_sunDirection.copy(_planetWorldPosition).normalize();
 
-		const sunDir = planetPos.clone().normalize();
-		const r = this.currentPlanet.radius;
+		const radius = this.currentPlanet.radius;
 
-		this.shadowLight.position.copy(planetPos).addScaledVector(sunDir, -(r * 5));
-		this.shadowLight.target.position.copy(planetPos);
+		this.shadowLight.position
+			.copy(_planetWorldPosition)
+			.addScaledVector(_sunDirection, -(radius * 5));
+
+		this.shadowLight.target.position.copy(_planetWorldPosition);
 		this.shadowLight.target.updateMatrixWorld();
 
-		const dist = planetPos.length();
-		const pointLightIntensity = STAR_INTENSITY / (1.5 * dist * dist);
+		const distanceToSun = _planetWorldPosition.length();
+		const pointLightIntensity = STAR_INTENSITY / (1.5 * distanceToSun * distanceToSun);
 
 		this.shadowLight.intensity = pointLightIntensity;
 	}
 
+	// ---------------------------------------------------------------------
+	// Debug
+	// ---------------------------------------------------------------------
+
 	_toggleDebugMode() {
 		this.debugActive = !this.debugActive;
 
-		if (this.debugActive) {
-			this._getPlanetList().forEach((planet) => {
+		this._getPlanetList().forEach((planet) => {
+			if (this.debugActive) {
 				planet.activateDebugMode();
-			});
-
-			this.player.activateDebugMode();
-		} else {
-			this._getPlanetList().forEach((planet) => {
+			} else {
 				planet.deactivateDebugMode();
-			});
-
-			this.player.deactivateDebugMode();
-		}
-	}
-
-	async _loadAssets() {
-		const loader = new GLTFLoader();
-
-		this.playerGLTF = await loader.loadAsync('./assets/little-prince.glb');
-		this.lampPostGLTF = await loader.loadAsync('./assets/lamp_post.glb');
-		this.iglooGLTF = await loader.loadAsync('./assets/igloo.glb');
-	}
-
-	_initPlanetObjects() {
-		const builder = new PlanetBuilder(this.planets, {
-			lampPostGLTF: this.lampPostGLTF,
-			iglooGLTF: this.iglooGLTF
+			}
 		});
 
-		builder.populate();
+		if (this.debugActive) {
+			this.player.activateDebugMode();
+		} else {
+			this.player.deactivateDebugMode();
+		}
 	}
 }

@@ -86,6 +86,7 @@ export default class Planet {
 		});
 
 		this.mesh = new THREE.Mesh(geometry, material);
+		this.mesh.castShadow = true;
 		this.mesh.receiveShadow = true;
 		this.axisTilt.add(this.mesh);
 
