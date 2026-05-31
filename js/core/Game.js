@@ -325,6 +325,38 @@ export default class Game {
 		}
 	}
 
+	_animateCollectibleToHud(worldPosition, score) {
+		const projected = worldPosition.clone().project(this.cameraRig.camera);
+
+		const isProjectedOnScreen =
+			Number.isFinite(projected.x) &&
+			Number.isFinite(projected.y) &&
+			Number.isFinite(projected.z) &&
+			projected.z > -1 &&
+			projected.z < 1 &&
+			Math.abs(projected.x) <= 1.15 &&
+			Math.abs(projected.y) <= 1.15;
+
+		const useCenterStart =
+			this.cameraMode === CAMERA_MODES.FIRST_PERSON ||
+			!isProjectedOnScreen;
+
+		const from = useCenterStart
+			? {
+				x: window.innerWidth * 0.5,
+				y: window.innerHeight * 0.55
+			}
+			: {
+				x: (projected.x * 0.5 + 0.5) * window.innerWidth,
+				y: (-projected.y * 0.5 + 0.5) * window.innerHeight
+			};
+
+		this.hud.animateOrbCollect({
+			from,
+			count: score
+		});
+	}
+
 	// ---------------------------------------------------------------------
 	// Scene setup
 	// ---------------------------------------------------------------------
@@ -456,7 +488,9 @@ export default class Game {
 		this.collectibleManager = new CollectibleManager({
 			planets: this.planets,
 			player: this.player,
-			onCollect: (score) => this.hud.setOrbCount(score)
+			onCollect: ({ score, worldPosition }) => {
+				this._animateCollectibleToHud(worldPosition, score);
+			}
 		});
 	}
 

@@ -11,6 +11,7 @@ const SPAWN = {
 
 const _playerNormal = new THREE.Vector3();
 const _spawnDirection = new THREE.Vector3();
+const _collectibleWorldPosition = new THREE.Vector3();
 
 export default class CollectibleManager {
 	constructor({ planets, player, onCollect = null }) {
@@ -39,7 +40,7 @@ export default class CollectibleManager {
 			this.collectible.planet.radius;
 
 		const collectDistance =
-			(this.collectible.collectRadius + this.player.radius) * 0.5;
+			(this.collectible.collectRadius + this.player.radius) * 0.65;
 
 		if (surfaceDistance < collectDistance) {
 			this.collect();
@@ -48,7 +49,13 @@ export default class CollectibleManager {
 
 	collect() {
 		this.score += 1;
-		this.onCollect?.(this.score);
+
+		this.collectible.root.getWorldPosition(_collectibleWorldPosition);
+
+		this.onCollect?.({
+			score: this.score,
+			worldPosition: _collectibleWorldPosition.clone()
+		});
 
 		this.spawnNext();
 	}

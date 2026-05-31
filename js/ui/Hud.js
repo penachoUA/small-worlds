@@ -23,11 +23,95 @@ export default class Hud {
 		this.setOrbCount(0);
 	}
 
+	animateOrbCollect({ from, count }) {
+		const targetRect = this.root.getBoundingClientRect();
+
+		const target = {
+			x: targetRect.left + targetRect.width * 0.5,
+			y: targetRect.top + targetRect.height * 0.5
+		};
+
+		const orb = document.createElement('div');
+
+		orb.style.position = 'fixed';
+		orb.style.left = `${from.x}px`;
+		orb.style.top = `${from.y}px`;
+		orb.style.width = '46px';
+		orb.style.height = '46px';
+		orb.style.borderRadius = '50%';
+		orb.style.pointerEvents = 'none';
+		orb.style.zIndex = '999';
+		orb.style.transform = 'translate(-50%, -50%) scale(1)';
+		orb.style.background = 'radial-gradient(circle, #fff 0%, #ffd1f0 28%, #ff4fd8 58%, rgba(255, 79, 216, 0) 72%)';
+		orb.style.boxShadow = '0 0 14px rgba(255, 79, 216, 0.95), 0 0 34px rgba(255, 79, 216, 0.75)';
+		orb.style.opacity = '1';
+
+		document.body.appendChild(orb);
+
+		const dx = target.x - from.x;
+		const dy = target.y - from.y;
+
+		const distance = Math.hypot(dx, dy);
+		const arcLift = Math.min(180, Math.max(60, distance * 0.22));
+
+		orb.animate(
+			[
+				{
+					transform: 'translate(-50%, -50%) scale(1)',
+					opacity: 1,
+					offset: 0
+				},
+				{
+					// Tiny pop away from the pickup point so the player notices it.
+					transform: `translate(calc(-50% + ${-dx * 0.05}px), calc(-50% + ${-dy * 0.05 - 18}px)) scale(1.35)`,
+					opacity: 1,
+					offset: 0.18
+				},
+				{
+					// Curved high point before being sucked into the counter.
+					transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.45 - arcLift}px)) scale(0.85)`,
+					opacity: 0.9,
+					offset: 0.62
+				},
+				{
+					transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.18)`,
+					opacity: 0.1,
+					offset: 1
+				}
+			],
+			{
+				duration: 1500,
+				easing: 'cubic-bezier(0.18, 0.85, 0.22, 1)',
+				fill: 'forwards'
+			}
+		);
+
+		window.setTimeout(() => {
+			orb.remove();
+			this.setOrbCount(count);
+			this._pulseCounter();
+		}, 870);
+	}
+
 	setOrbCount(count) {
 		this.root.textContent = `✦ ${count}`;
 	}
 
 	dispose() {
 		this.root.remove();
+	}
+
+	_pulseCounter() {
+		this.root.animate(
+			[
+				{ transform: 'scale(1)' },
+				{ transform: 'scale(1.16)' },
+				{ transform: 'scale(1)' }
+			],
+			{
+				duration: 260,
+				easing: 'ease-out'
+			}
+		);
 	}
 }
