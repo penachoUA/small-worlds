@@ -38,9 +38,12 @@ const CAMERA_CONFIGS = {
 	},
 	[CAMERA_MODES.FIRST_PERSON]: {
 		sensitivity: 0.001,
+		minYaw: -Math.PI * 0.45,
+		maxYaw: Math.PI * 0.45,
 		minPitch: -1.0,
 		maxPitch: 1.0,
-		autoCenter: true
+		autoCenter: true,
+		pitch: -0.15
 	},
 	[CAMERA_MODES.PLANET]: {
 		sensitivity: 0.0035,
@@ -228,6 +231,8 @@ export default class Game {
 		this.cameraMode = mode;
 		this._activateCameraController(mode);
 
+		this.activeCameraController?.startAutoCenter?.();
+
 		const started = this.cameraTransitionEngine.transitionToMode(mode, {
 			duration
 		});
@@ -248,8 +253,6 @@ export default class Game {
 		if (this.planetTravel?.phase === 'toTarget') {
 			this._finishPlanetTravel();
 		}
-
-		this.activeCameraController?.startAutoCenter?.();
 	}
 
 	_activateCameraController(mode) {

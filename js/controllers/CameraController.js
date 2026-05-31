@@ -2,6 +2,8 @@ const DEFAULTS = {
 	YAW: 0,
 	PITCH: -0.6,
 	SENSITIVITY: 0.002,
+	MIN_YAW: -Infinity,
+	MAX_YAW: Infinity,
 	MIN_PITCH: -1.5,
 	MAX_PITCH: 0.3,
 	CENTERING_SPEED: 0.03,
@@ -32,6 +34,8 @@ export default class CameraController {
 		this.sensitivity = config.sensitivity ?? DEFAULTS.SENSITIVITY;
 		this.minPitch = config.minPitch ?? DEFAULTS.MIN_PITCH;
 		this.maxPitch = config.maxPitch ?? DEFAULTS.MAX_PITCH;
+		this.minYaw = config.minYaw ?? DEFAULTS.MIN_YAW;
+		this.maxYaw = config.maxYaw ?? DEFAULTS.MAX_YAW;
 
 		this.currentYaw = this.defaultYaw;
 		this.currentPitch = this.defaultPitch;
@@ -66,6 +70,14 @@ export default class CameraController {
 			this.isCentering = false;
 
 			this.currentYaw -= this.input.mouse.moveX * this.sensitivity;
+
+			if (Number.isFinite(this.minYaw) || Number.isFinite(this.maxYaw)) {
+				this.currentYaw = Math.max(
+					this.minYaw,
+					Math.min(this.maxYaw, this.currentYaw)
+				);
+			}
+
 			this.currentPitch -= this.input.mouse.moveY * this.sensitivity;
 
 			if (!this.unconstrained) {

@@ -50,7 +50,7 @@ export default class IceCrystalCluster {
 		};
 
 		this.obstacle = {
-			radius: width * 0.10,
+			radius: width * 0.20,
 			cameraRadius: width * 0.26,
 			height
 		};

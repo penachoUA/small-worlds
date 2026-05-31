@@ -225,7 +225,7 @@ export default class CameraTransitionEngine {
 				return target.set(0, player.height * 0.01, 0);
 
 			case this.modes.FIRST_PERSON:
-				return target.set(0, player.height * 0.8, 0);
+				return target.set(0, player.height * 0.4, -0.05);
 
 			case this.modes.PLANET:
 			case this.modes.SYSTEM:
