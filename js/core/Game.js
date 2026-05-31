@@ -11,6 +11,7 @@ import CameraRig from '../camera/CameraRig.js';
 import CameraTransitionEngine from '../camera/CameraTransitionEngine.js';
 import InputHandler from './InputHandler.js';
 import PlanetBuilder from '../world/PlanetBuilder.js';
+import CollectibleManager from '../world/CollectibleManager.js';
 import Skybox from './Skybox.js';
 
 const STAR_INTENSITY = 140;
@@ -97,6 +98,7 @@ export default class Game {
 			this._initLighting();
 			this._initSystem();
 			this._initPlayer();
+			this._initCollectibles();
 			this._initControllers();
 			this._initResizeHandler();
 			this._initShadows();
@@ -136,6 +138,7 @@ export default class Game {
 		}
 
 		this._updatePlayerAndCamera(delta);
+		this.collectibleManager.update();
 		this._handleInput();
 
 		this.activeCameraController?.update(this.player.isMoving);
@@ -437,6 +440,13 @@ export default class Game {
 		};
 
 		this.activeCameraController = this.cameraControllers[CAMERA_MODES.THIRD_PERSON];
+	}
+
+	_initCollectibles() {
+		this.collectibleManager = new CollectibleManager({
+			planets: this.planets,
+			player: this.player
+		});
 	}
 
 	_initResizeHandler() {
