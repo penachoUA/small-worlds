@@ -13,6 +13,7 @@ import InputHandler from './InputHandler.js';
 import PlanetBuilder from '../world/PlanetBuilder.js';
 import CollectibleManager from '../world/CollectibleManager.js';
 import Skybox from './Skybox.js';
+import Hud from '../ui/Hud.js';
 
 const STAR_INTENSITY = 140;
 
@@ -89,6 +90,8 @@ export default class Game {
 
 		this.planets = {};
 		this.planetTravel = null;
+
+		this.hud = new Hud();
 
 		initComposer(this.cameraRig.camera);
 
@@ -174,13 +177,6 @@ export default class Game {
 
 	changePlanet(planetId) {
 		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
-
-		if (
-			this.cameraMode === CAMERA_MODES.SYSTEM ||
-			this.cameraMode === CAMERA_MODES.PLANET
-		) {
-			return;
-		}
 
 		const targetPlanet = this._getPlanetById(planetId);
 
@@ -445,7 +441,8 @@ export default class Game {
 	_initCollectibles() {
 		this.collectibleManager = new CollectibleManager({
 			planets: this.planets,
-			player: this.player
+			player: this.player,
+			onCollect: (score) => this.hud.setOrbCount(score)
 		});
 	}
 

@@ -13,9 +13,10 @@ const _playerNormal = new THREE.Vector3();
 const _spawnDirection = new THREE.Vector3();
 
 export default class CollectibleManager {
-	constructor({ planets, player }) {
+	constructor({ planets, player, onCollect = null }) {
 		this.planets = planets;
 		this.player = player;
+		this.onCollect = onCollect;
 		this.collectible = new Collectible();
 		this.score = 0;
 		this.currentSpawn = null;
@@ -38,8 +39,7 @@ export default class CollectibleManager {
 			this.collectible.planet.radius;
 
 		const collectDistance =
-			this.collectible.collectRadius +
-			this.player.radius;
+			(this.collectible.collectRadius + this.player.radius) * 0.5;
 
 		if (surfaceDistance < collectDistance) {
 			this.collect();
@@ -48,7 +48,7 @@ export default class CollectibleManager {
 
 	collect() {
 		this.score += 1;
-		console.log(`Collected star fragment: ${this.score}`);
+		this.onCollect?.(this.score);
 
 		this.spawnNext();
 	}
