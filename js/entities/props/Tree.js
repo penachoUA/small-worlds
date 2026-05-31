@@ -5,7 +5,6 @@ const GEOMETRIES = {
 	trunk: new THREE.CylinderGeometry(0.32, 0.5, 1, 6),
 	cone: new THREE.ConeGeometry(0.5, 1, 7),
 	leafBlob: new THREE.DodecahedronGeometry(1, 0),
-	root: new THREE.BoxGeometry(1, 1, 1),
 };
 
 const MATERIALS = new Map();

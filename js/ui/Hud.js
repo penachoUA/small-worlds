@@ -54,7 +54,7 @@ export default class Hud {
 		const distance = Math.hypot(dx, dy);
 		const arcLift = Math.min(180, Math.max(60, distance * 0.22));
 
-		orb.animate(
+		const animation = orb.animate(
 			[
 				{
 					transform: 'translate(-50%, -50%) scale(1)',
@@ -80,17 +80,17 @@ export default class Hud {
 				}
 			],
 			{
-				duration: 1500,
+				duration: 1000,
 				easing: 'cubic-bezier(0.18, 0.85, 0.22, 1)',
 				fill: 'forwards'
 			}
 		);
 
-		window.setTimeout(() => {
+		animation.finished.finally(() => {
 			orb.remove();
 			this.setOrbCount(count);
 			this._pulseCounter();
-		}, 870);
+		});
 	}
 
 	setOrbCount(count) {

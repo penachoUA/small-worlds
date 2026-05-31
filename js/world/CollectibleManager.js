@@ -15,7 +15,7 @@ const _collectibleWorldPosition = new THREE.Vector3();
 
 export default class CollectibleManager {
 	constructor({ planets, player, onCollect = null }) {
-		this.planets = planets;
+		this.planetList = planets;
 		this.player = player;
 		this.onCollect = onCollect;
 		this.collectible = new Collectible();
@@ -141,13 +141,11 @@ export default class CollectibleManager {
 	}
 
 	_randomPlanet(avoidPlanet = null) {
-		const planets = Object.values(this.planets);
+		if (this.planetList.length === 0) return null;
 
-		if (planets.length === 0) return null;
-
-		const candidates = avoidPlanet && planets.length > 1
-			? planets.filter((planet) => planet !== avoidPlanet)
-			: planets;
+		const candidates = avoidPlanet && this.planetList.length > 1
+			? this.planetList.filter((planet) => planet !== avoidPlanet)
+			: this.planetList;
 
 		return candidates[Math.floor(Math.random() * candidates.length)];
 	}

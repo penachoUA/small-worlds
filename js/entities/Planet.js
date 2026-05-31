@@ -31,6 +31,9 @@ GRADIENT_MAP.magFilter = THREE.NearestFilter;
 GRADIENT_MAP.generateMipmaps = false;
 GRADIENT_MAP.needsUpdate = true;
 
+// Reusable vectors
+const _blockingSurfaceNormal = new THREE.Vector3();
+
 export default class Planet {
 	constructor({
 		name = null,
@@ -137,7 +140,7 @@ export default class Planet {
 		this.addToSurface(object, normal, sinkFactor);
 
 		object.planet = this;
-		object.surfaceNormal = normal;
+		object.surfaceNormal = normal.clone();
 		object.sinkFactor = sinkFactor;
 
 		if (!this.props.includes(object)) {
@@ -148,17 +151,16 @@ export default class Planet {
 	}
 
 	getBlockingProp(surfaceNormal, extraRadius = 0) {
-		const normal = surfaceNormal.clone().normalize();
+		_blockingSurfaceNormal.copy(surfaceNormal).normalize();
 
 		return this.props.find((prop) => {
 			if (!prop.obstacle || !prop.surfaceNormal) return false;
 
-			const obstacleNormal = prop.surfaceNormal.clone().normalize();
-
-			const angle = normal.angleTo(obstacleNormal);
+			const angle = prop.surfaceNormal.angleTo(_blockingSurfaceNormal);
 			const surfaceDistance = angle * this.radius;
+			const obstacleRadius = prop.obstacle.radius ?? 0;
 
-			return surfaceDistance < prop.obstacle.radius + extraRadius;
+			return surfaceDistance < obstacleRadius + extraRadius;
 		});
 	}
 

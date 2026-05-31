@@ -91,6 +91,7 @@ export default class Game {
 		});
 
 		this.planets = {};
+		this.planetList = [];	// Planet list cache
 		this.planetTravel = null;
 
 		this.hud = new Hud();
@@ -332,9 +333,7 @@ export default class Game {
 		if (!this.input.mouse.wasClicked) return;
 		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
-		const candidatePlanets = this._getPlanetList().filter(
-			(planet) => planet !== this.currentPlanet
-		);
+		const candidatePlanets = this._getPlanetList();
 
 		if (candidatePlanets.length === 0) return;
 
@@ -472,7 +471,9 @@ export default class Game {
 
 		this._initPlanetObjects();
 
-		this._getPlanetList().forEach((planet) => {
+		this.planetList = Object.values(this.planets).sort((a, b) => a.id - b.id);
+
+		this.planetList.forEach((planet) => {
 			planet.addTo(scene);
 		});
 
@@ -523,7 +524,7 @@ export default class Game {
 
 	_initCollectibles() {
 		this.collectibleManager = new CollectibleManager({
-			planets: this.planets,
+			planets: this.planetList,
 			player: this.player,
 			onCollect: ({ score, worldPosition }) => {
 				this._animateCollectibleToHud(worldPosition, score);
@@ -548,7 +549,7 @@ export default class Game {
 	_initShadows() {
 		this.shadowLight = new THREE.DirectionalLight(0xffffff, 0.8);
 		this.shadowLight.castShadow = true;
-		this.shadowLight.shadow.mapSize.set(8192, 8192);
+		this.shadowLight.shadow.mapSize.set(4096, 4096);
 		this.shadowLight.shadow.normalBias = 0.02;
 
 		scene.add(this.shadowLight);
@@ -576,7 +577,7 @@ export default class Game {
 	}
 
 	_getPlanetList() {
-		return Object.values(this.planets).sort((a, b) => a.id - b.id);
+		return this.planetList;
 	}
 
 	_getPlanetById(id) {
