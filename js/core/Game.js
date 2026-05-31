@@ -71,6 +71,8 @@ const CAMERA_MODE_TRANSITION = {
 
 const _planetWorldPosition = new THREE.Vector3();
 const _sunDirection = new THREE.Vector3();
+const _pointer = new THREE.Vector2();
+const _raycaster = new THREE.Raycaster();
 
 export default class Game {
 	constructor(onReady = null, debug = false) {
@@ -220,6 +222,7 @@ export default class Game {
 			this.cycleCameraMode(reverse ? -1 : 1);
 		}
 
+		this._handlePlanetClickTravel();
 		this._handlePlanetTravelInput();
 	}
 
@@ -323,6 +326,40 @@ export default class Game {
 				this.changePlanet(i);
 			}
 		}
+	}
+
+	_handlePlanetClickTravel() {
+		if (!this.input.mouse.wasClicked) return;
+		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
+
+		const candidatePlanets = this._getPlanetList().filter(
+			(planet) => planet !== this.currentPlanet
+		);
+
+		if (candidatePlanets.length === 0) return;
+
+		_pointer.x = (this.input.mouse.x / window.innerWidth) * 2 - 1;
+		_pointer.y = -(this.input.mouse.y / window.innerHeight) * 2 + 1;
+
+		scene.updateMatrixWorld(true);
+
+		_raycaster.setFromCamera(_pointer, this.cameraRig.camera);
+
+		const intersects = _raycaster.intersectObjects(
+			candidatePlanets.map((planet) => planet.mesh),
+			false
+		);
+
+		if (intersects.length === 0) return;
+
+		const targetMesh = intersects[0].object;
+		const targetPlanet = candidatePlanets.find(
+			(planet) => planet.mesh === targetMesh
+		);
+
+		if (!targetPlanet) return;
+
+		this.changePlanet(targetPlanet.id);
 	}
 
 	_animateCollectibleToHud(worldPosition, score) {
