@@ -165,14 +165,14 @@ export default class Game {
 		this._startCameraModeTransition(mode);
 	}
 
-	cycleCameraMode() {
+	cycleCameraMode(direction = 1) {
 		if (this.cameraTransitionEngine.isActive || this.planetTravel) return;
 
 		const modes = Object.values(CAMERA_MODES);
 		const index = modes.indexOf(this.cameraMode);
-		const nextMode = modes[(index + 1) % modes.length];
+		const nextIndex = (index + direction + modes.length) % modes.length;
 
-		this.transitionToCameraMode(nextMode);
+		this.transitionToCameraMode(modes[nextIndex]);
 	}
 
 	changePlanet(planetId) {
@@ -185,7 +185,12 @@ export default class Game {
 			return;
 		}
 
-		if (targetPlanet === this.currentPlanet) return;
+		if (
+			targetPlanet === this.currentPlanet &&
+			this.cameraMode !== CAMERA_MODES.SYSTEM
+		) {
+			return;
+		}
 
 		this._startPlanetTravel(targetPlanet);
 	}
@@ -208,7 +213,11 @@ export default class Game {
 
 	_handleInput() {
 		if (this.input.isTapped(CONTROLS.CYCLE_CAMERA)) {
-			this.cycleCameraMode();
+			const reverse =
+				this.input.isPressed('ShiftLeft') ||
+				this.input.isPressed('ShiftRight');
+
+			this.cycleCameraMode(reverse ? -1 : 1);
 		}
 
 		this._handlePlanetTravelInput();
@@ -265,15 +274,20 @@ export default class Game {
 	}
 
 	_startPlanetTravel(targetPlanet) {
-		const returnMode = this.cameraMode === CAMERA_MODES.FIRST_PERSON
-			? CAMERA_MODES.FIRST_PERSON
-			: CAMERA_MODES.THIRD_PERSON;
+		const returnMode = this.cameraMode === CAMERA_MODES.SYSTEM
+			? CAMERA_MODES.THIRD_PERSON
+			: this.cameraMode;
 
 		this.planetTravel = {
 			targetPlanet,
 			returnMode,
 			phase: 'toSystem'
 		};
+
+		if (this.cameraMode === CAMERA_MODES.SYSTEM) {
+			this._transitionFromSystemToPlanet();
+			return;
+		}
 
 		this._startCameraModeTransition(
 			CAMERA_MODES.SYSTEM,
